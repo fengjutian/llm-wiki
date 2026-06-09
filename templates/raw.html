@@ -31,7 +31,7 @@
 <!-- Preview Modal -->
 <div id="preview-modal" class="modal modal-hidden">
     <div class="modal-overlay" onclick="closePreviewModal()"></div>
-    <div class="modal-content card" style="max-width:900px;max-height:85vh">
+    <div class="modal-content card" style="max-height:85vh">
         <div class="card-header card-header-row">
             <span id="preview-title" style="font-size:17px">📄 文件预览</span>
             <button class="btn btn-sm" onclick="closePreviewModal()">✕</button>
@@ -122,9 +122,8 @@ async function loadFiles() {
         const resp = await fetch('/api/raw/files');
         const data = await resp.json();
         const rawFiles = data.raw_files || data.files || []; // backward compat
-        const wikiFiles = data.wiki_files || [];
 
-        if (rawFiles.length === 0 && wikiFiles.length === 0) {
+        if (rawFiles.length === 0) {
             container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">暂无文件，点击 <b>📤 上传文件</b> 开始。</p>';
             container.classList.remove('loading');
             return;
@@ -133,52 +132,27 @@ async function loadFiles() {
         let html = '';
 
         // ---- Raw source files ----
-        if (rawFiles.length > 0) {
-            html += '<h2 style="margin:16px 0 8px">📁 Raw 源文件 <span style="font-size:14px;color:var(--muted);font-weight:normal">(' + rawFiles.length + ')</span></h2>';
-            rawFiles.forEach((f) => {
-                const statusClass = 'status-' + f.status;
-                const rowId = safeId(f.path);
-                html += '<div class="file-row" id="row-' + rowId + '">' +
-                    '<div class="file-info">' +
-                        '<div class="file-name" style="cursor:pointer" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="点击预览文件">📄 <span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">' + escapeHtml(f.path) + '</span></div>' +
-                        '<div class="file-meta">' + formatSize(f.size) + ' · <code>' + escapeHtml(f.hash) + '</code></div>' +
-                        '<div class="wiki-links">' +
-                            '<span class="status-badge ' + statusClass + '">' + (statusLabels[f.status] || f.status) + '</span>' +
-                            (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<span style="color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="event.stopPropagation();previewWikiFile(\'' + escapeJs(p) + '\')" title="点击预览 [[ ' + escapeHtml(p) + ' ]]">[[' + escapeHtml(p) + ']]</span>'}).join(', ') : '') +
-                        '</div>' +
+        html += '<h2 style="margin:16px 0 8px">📁 Raw 源文件 <span style="font-size:14px;color:var(--muted);font-weight:normal">(' + rawFiles.length + ')</span></h2>';
+        rawFiles.forEach((f) => {
+            const statusClass = 'status-' + f.status;
+            const rowId = safeId(f.path);
+            html += '<div class="file-row" id="row-' + rowId + '">' +
+                '<div class="file-info">' +
+                    '<div class="file-name" style="cursor:pointer" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="点击预览文件">📄 <span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">' + escapeHtml(f.path) + '</span></div>' +
+                    '<div class="file-meta">' + formatSize(f.size) + ' · <code>' + escapeHtml(f.hash) + '</code></div>' +
+                    '<div class="wiki-links">' +
+                        '<span class="status-badge ' + statusClass + '">' + (statusLabels[f.status] || f.status) + '</span>' +
+                        (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<span style="color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="event.stopPropagation();previewWikiFile(\'' + escapeJs(p) + '\')" title="点击预览 [[ ' + escapeHtml(p) + ' ]]">[[' + escapeHtml(p) + ']]</span>'}).join(', ') : '') +
                     '</div>' +
-                    '<div class="file-actions">' +
-                        '<button class="btn btn-sm" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="预览文件内容">👁 预览</button>' +
-                        '<button class="btn btn-sm btn-primary" onclick="ingestFile(\'' + escapeJs(f.path) + '\', \'' + rowId + '\')" id="btn-' + rowId + '">' +
-                            '🤖 ' + (f.status === 'ingested' ? '重新生成' : 'AI 生成 Wiki') +
-                        '</button>' +
-                    '</div>' +
-                '</div>';
-            });
-        }
-
-        // ---- Generated wiki pages ----
-        if (wikiFiles.length > 0) {
-            html += '<h2 style="margin:24px 0 8px">📝 生成的 Wiki 页面 <span style="font-size:14px;color:var(--muted);font-weight:normal">(' + wikiFiles.length + ')</span></h2>';
-            wikiFiles.forEach((f) => {
-                const icon = pageTypeIcons[f.page_type] || '📄';
-                const typeLabel = pageTypeLabels[f.page_type] || f.page_type;
-                const rowId = safeId('wiki-' + f.title);
-                html += '<div class="file-row" id="row-' + rowId + '">' +
-                    '<div class="file-info" style="cursor:pointer" onclick="previewWikiFile(\'' + escapeJs(f.title) + '\')" title="点击预览页面">' +
-                        '<div class="file-name">' + icon + ' <span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">' + escapeHtml(f.title) + '</span></div>' +
-                        '<div class="file-meta">' + formatSize(f.size) + ' · ' + escapeHtml(f.filename) + '</div>' +
-                        '<div class="wiki-links">' +
-                            '<span class="status-badge status-' + f.status + '">' + typeLabel + ' · ' + (f.status || 'draft') + '</span>' +
-                            (f.summary ? ' <span style="font-size:12px;color:var(--muted)">' + escapeHtml(f.summary) + '</span>' : '') +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="file-actions">' +
-                        '<button class="btn btn-sm" onclick="previewWikiFile(\'' + escapeJs(f.title) + '\')" title="预览 Markdown 源码">👁 预览</button>' +
-                    '</div>' +
-                '</div>';
-            });
-        }
+                '</div>' +
+                '<div class="file-actions">' +
+                    '<button class="btn btn-sm" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="预览文件内容">👁 预览</button>' +
+                    '<button class="btn btn-sm btn-primary" onclick="ingestFile(\'' + escapeJs(f.path) + '\', \'' + rowId + '\')" id="btn-' + rowId + '">' +
+                        '🤖 ' + (f.status === 'ingested' ? '重新生成' : 'AI 生成 Wiki') +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+        });
 
         container.innerHTML = html;
         container.classList.remove('loading');
