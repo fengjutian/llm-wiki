@@ -236,7 +236,7 @@ async def api_read_raw_file(filename: str):
 
 @app.get("/api/wiki/preview/{name:path}")
 async def api_read_wiki_file(name: str):
-    """Read the raw markdown content of a wiki page for preview."""
+    """Read the raw markdown content of a wiki page for preview, with full metadata."""
     if not name:
         return JSONResponse({"error": "missing page name"}, status_code=400)
     from core.wiki_io import read_page
@@ -244,7 +244,20 @@ async def api_read_wiki_file(name: str):
     if not page:
         return JSONResponse({"error": "page not found", "name": name}, status_code=404)
     content = page.full_markdown
-    return {"filename": page.filename, "title": page.title, "content": content, "size": len(content)}
+    fm = page.frontmatter
+    return {
+        "filename": page.filename,
+        "title": page.title,
+        "content": content,
+        "size": len(content),
+        "page_type": fm.get("page_type", ""),
+        "status": fm.get("status", ""),
+        "summary": fm.get("summary", ""),
+        "confidence": fm.get("confidence", ""),
+        "sources": fm.get("sources", []),
+        "created_at": fm.get("created_at", ""),
+        "updated_at": fm.get("updated_at", ""),
+    }
 
 
 def _get_ingested_hashes() -> dict[str, str]:

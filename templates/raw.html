@@ -31,13 +31,19 @@
 <!-- Preview Modal -->
 <div id="preview-modal" class="modal modal-hidden">
     <div class="modal-overlay" onclick="closePreviewModal()"></div>
-    <div class="modal-content card" style="max-width:900px">
+    <div class="modal-content card" style="max-width:900px;max-height:85vh">
         <div class="card-header card-header-row">
-            <span id="preview-title">📄 文件预览</span>
+            <span id="preview-title" style="font-size:17px">📄 文件预览</span>
             <button class="btn btn-sm" onclick="closePreviewModal()">✕</button>
         </div>
-        <div style="margin-bottom:8px;font-size:12px;color:var(--muted)" id="preview-meta"></div>
-        <pre id="preview-content" style="max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-word">加载中...</pre>
+        <!-- 元数据区 -->
+        <div id="preview-meta" style="margin-bottom:12px"></div>
+        <!-- 摘要 -->
+        <div id="preview-summary" style="margin-bottom:12px;padding:12px;background:rgba(88,166,255,.06);border-left:3px solid var(--accent);border-radius:6px;display:none"></div>
+        <!-- 正文 -->
+        <div id="preview-body" style="max-height:50vh;overflow:auto">
+            <pre id="preview-content" style="white-space:pre-wrap;word-break:break-word;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:13px;margin:0">加载中...</pre>
+        </div>
     </div>
 </div>
 
@@ -88,7 +94,7 @@
 {% endblock %}
 {% block scripts %}
 <script>
-const statusLabels = { pending: '待处理', ingested: '已生成', modified: '已修改' };
+const statusLabels = { pending: '待处理', ingested: '已生成', modified: '已修改', draft:'草稿', active:'活跃', stale:'过时', contradicted:'矛盾', archived:'归档' };
 const pageTypeIcons = { entity: '🏷️', concept: '💡', source_summary: '📋', overview: '🗺️', comparison: '⚖️' };
 const pageTypeLabels = { entity: '实体', concept: '概念', source_summary: '源摘要', overview: '综述', comparison: '对比' };
 
@@ -136,11 +142,11 @@ async function loadFiles() {
                 const rowId = safeId(f.path);
                 html += '<div class="file-row" id="row-' + rowId + '">' +
                     '<div class="file-info">' +
-                        '<div class="file-name">📄 ' + escapeHtml(f.path) + '</div>' +
+                        '<div class="file-name" style="cursor:pointer" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="点击预览文件">📄 <span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">' + escapeHtml(f.path) + '</span></div>' +
                         '<div class="file-meta">' + formatSize(f.size) + ' · <code>' + escapeHtml(f.hash) + '</code></div>' +
                         '<div class="wiki-links">' +
                             '<span class="status-badge ' + statusClass + '">' + (statusLabels[f.status] || f.status) + '</span>' +
-                            (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<a href="/page/' + encodeURIComponent(p) + '">[[' + escapeHtml(p) + ']]</a>'}).join(', ') : '') +
+                            (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<span style="color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="event.stopPropagation();previewWikiFile(\'' + escapeJs(p) + '\')" title="点击预览 [[ ' + escapeHtml(p) + ' ]]">[[' + escapeHtml(p) + ']]</span>'}).join(', ') : '') +
                         '</div>' +
                     '</div>' +
                     '<div class="file-actions">' +
@@ -161,8 +167,8 @@ async function loadFiles() {
                 const typeLabel = pageTypeLabels[f.page_type] || f.page_type;
                 const rowId = safeId('wiki-' + f.title);
                 html += '<div class="file-row" id="row-' + rowId + '">' +
-                    '<div class="file-info">' +
-                        '<div class="file-name">' + icon + ' <a href="/page/' + encodeURIComponent(f.title) + '">' + escapeHtml(f.title) + '</a></div>' +
+                    '<div class="file-info" style="cursor:pointer" onclick="previewWikiFile(\'' + escapeJs(f.title) + '\')" title="点击预览页面">' +
+                        '<div class="file-name">' + icon + ' <span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">' + escapeHtml(f.title) + '</span></div>' +
                         '<div class="file-meta">' + formatSize(f.size) + ' · ' + escapeHtml(f.filename) + '</div>' +
                         '<div class="wiki-links">' +
                             '<span class="status-badge status-' + f.status + '">' + typeLabel + ' · ' + (f.status || 'draft') + '</span>' +
@@ -211,7 +217,50 @@ async function previewWikiFile(title) {
         const resp = await fetch('/api/wiki/preview/' + encodeURIComponent(title));
         if (!resp.ok) { throw new Error('页面不存在 (' + resp.status + ')'); }
         const data = await resp.json();
-        document.getElementById('preview-meta').textContent = '大小: ' + formatSize(data.size) + ' · ' + data.content.split('\n').length + ' 行 · ' + escapeHtml(data.filename);
+
+        // Title with icon
+        const icon = pageTypeIcons[data.page_type] || '📄';
+        document.getElementById('preview-title').innerHTML = icon + ' ' + escapeHtml(data.title);
+
+        // Metadata tags row
+        let metaHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px">';
+        if (data.page_type) metaHtml += '<span class="tag tag-'+data.page_type+'">'+(pageTypeLabels[data.page_type]||data.page_type)+'</span>';
+        if (data.status)   metaHtml += '<span class="tag tag-'+data.status+'">'+(statusLabels[data.status]||data.status)+'</span>';
+        if (data.confidence) metaHtml += '<span style="font-size:12px;color:var(--muted)">置信度: <strong>'+escapeHtml(data.confidence)+'</strong></span>';
+        metaHtml += '</div>';
+
+        // File info row
+        const lines = data.content.split('\n').length;
+        const sizeStr = data.size > 1024 ? (data.size/1024).toFixed(1)+' KB' : data.size+' B';
+        metaHtml += '<div style="font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px">';
+        metaHtml += '<span>📄 '+escapeHtml(data.filename)+'</span>';
+        metaHtml += '<span>📏 '+sizeStr+' · '+lines+' 行</span>';
+        if (data.updated_at) metaHtml += '<span>🕐 更新: '+escapeHtml(data.updated_at)+'</span>';
+        if (data.created_at) metaHtml += '<span>📅 创建: '+escapeHtml(data.created_at)+'</span>';
+        metaHtml += '</div>';
+
+        // Sources
+        if (data.sources && data.sources.length) {
+            metaHtml += '<div style="font-size:12px;color:var(--muted);margin-top:4px">📎 来源: ';
+            metaHtml += data.sources.map(function(s){
+                let t = typeof s==='string' ? s : (s.file||'');
+                let sec = (s.sections||[]).join(', ');
+                return '<code>'+escapeHtml(t)+(sec?' <span style="color:var(--yellow)">§'+escapeHtml(sec)+'</span>':'')+'</code>';
+            }).join(', ');
+            metaHtml += '</div>';
+        }
+        document.getElementById('preview-meta').innerHTML = metaHtml;
+
+        // Summary
+        const summaryEl = document.getElementById('preview-summary');
+        if (data.summary) {
+            summaryEl.style.display = 'block';
+            summaryEl.innerHTML = '<strong>📝 摘要</strong><br><span style="color:var(--muted);font-size:13px">'+escapeHtml(data.summary)+'</span>';
+        } else {
+            summaryEl.style.display = 'none';
+        }
+
+        // Content
         document.getElementById('preview-content').textContent = data.content;
     } catch(e) {
         document.getElementById('preview-content').textContent = '加载失败: ' + e.message;
