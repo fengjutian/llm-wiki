@@ -252,6 +252,19 @@ def _cache_path() -> Path:
     return get_settings().wiki_root / ".graph_cache.pkl"
 
 
+def _cache_is_stale() -> bool:
+    """Check if any .md file in wiki/ is newer than the cache file."""
+    cp = _cache_path()
+    if not cp.exists():
+        return True
+    cache_mtime = cp.stat().st_mtime
+    wiki_path = get_settings().wiki_root
+    for f in wiki_path.rglob("*.md"):
+        if f.stat().st_mtime > cache_mtime:
+            return True
+    return False
+
+
 def load_cached_graph() -> Optional[nx.DiGraph]:
     """Load graph from pickle cache if available."""
     cp = _cache_path()
@@ -288,8 +301,12 @@ def invalidate_graph_cache() -> None:
 
 
 def get_graph(force_rebuild: bool = False) -> nx.DiGraph:
-    """Get the wiki graph – from cache if available, otherwise build."""
-    if not force_rebuild:
+    """Get the wiki graph – from cache if fresh, otherwise build.
+
+    Uses mtime-based staleness check so manual edits to .md files are picked up.
+    Pass force_rebuild=True to skip the cache entirely (e.g. on startup).
+    """
+    if not force_rebuild and not _cache_is_stale():
         cached = load_cached_graph()
         if cached is not None:
             return cached

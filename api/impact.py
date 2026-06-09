@@ -19,7 +19,7 @@ async def analyze_impact(req: AnalyzeRequest):
 
     Returns all pages transitively linked (outgoing) up to `depth` hops.
     """
-    G = get_graph(force_rebuild=True)
+    G = get_graph()  # use cache if fresh
     affected = impact_analysis(G, req.page, req.depth)
     return {
         "page": req.page,

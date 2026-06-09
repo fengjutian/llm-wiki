@@ -342,7 +342,7 @@ def lint_wiki(*, auto_fix: bool = False) -> LintReport:
 
     # --- Structural checks (graph-based, fast) ---
     try:
-        G = get_graph(force_rebuild=True)
+        G = get_graph()  # use cache if fresh
 
         # orphans
         for orphan in find_orphans(G):
