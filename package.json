@@ -1,0 +1,53 @@
+{
+  "name": "llm-wiki",
+  "version": "0.1.0",
+  "description": "LLM Wiki – Desktop application",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.llm-wiki.app",
+    "productName": "LLM Wiki",
+    "files": [
+      "electron/**/*",
+      "app/**/*",
+      "api/**/*",
+      "core/**/*",
+      "templates/**/*",
+      "static/**/*",
+      "wiki/**/*",
+      "raw/**/*",
+      "CLAUDE.md",
+      "pyproject.toml",
+      "settings.json.example"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "python-dist"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": null
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": null
+    }
+  }
+}
