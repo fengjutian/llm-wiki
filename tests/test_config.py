@@ -30,8 +30,8 @@ class TestSettings:
     def test_small_llm_fallback(self):
         """Small model API key/base should fall back to primary."""
         s = Settings(llm_api_base="https://primary.api", llm_api_key="pk")
-        assert s.small_llm_api_base == "https://primary.api"
-        assert s.small_llm_api_key == "pk"
+        assert s.resolved_small_api_base == "https://primary.api"
+        assert s.resolved_small_api_key == "pk"
 
     def test_auto_approve_defaults(self):
         s = Settings()
@@ -53,5 +53,6 @@ class TestSettingsFromEnv:
         s = Settings()
         assert s.wiki_path == "/custom/wiki"
         assert s.llm_model == "deepseek-chat"
+
 
 
