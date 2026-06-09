@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}LLM Wiki{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script>/* prevent theme flash */ (function(){var t=localStorage.getItem('wiki-theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia('(prefers-color-scheme:light)').matches)document.documentElement.setAttribute('data-theme','light')})()</script>
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -25,6 +26,10 @@
                 <a href="/config" class="nav-item">⚙️ 配置</a>
             </nav>
             <div class="sidebar-footer">
+                <button class="theme-toggle" onclick="toggleTheme()" title="切换深色/浅色主题">
+                    <span class="icon" id="theme-icon">🌙</span>
+                    <span id="theme-label">深色模式</span>
+                </button>
                 <div id="health-badge">⚪ 加载中...</div>
             </div>
         </aside>
@@ -34,11 +39,39 @@
     </div>
     {% block scripts %}{% endblock %}
     <script>
+        function applyTheme(theme){
+            document.documentElement.setAttribute('data-theme',theme);
+            localStorage.setItem('wiki-theme',theme);
+            var icon=document.getElementById('theme-icon');
+            var label=document.getElementById('theme-label');
+            if(icon)icon.textContent=theme==='light'?'☀️':'🌙';
+            if(label)label.textContent=theme==='light'?'浅色模式':'深色模式';
+        }
+
+        function toggleTheme(){
+            var cur=document.documentElement.getAttribute('data-theme');
+            applyTheme(cur==='light'?'dark':'light');
+        }
+
+        document.addEventListener('DOMContentLoaded',function(){
+            var saved=localStorage.getItem('wiki-theme');
+            if(!saved){
+                saved=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';
+            }
+            applyTheme(saved);
+
+            window.matchMedia('(prefers-color-scheme:light)').addEventListener('change',function(e){
+                if(!localStorage.getItem('wiki-theme')){
+                    applyTheme(e.matches?'light':'dark');
+                }
+            });
+        });
+
         // Load wiki stats for the sidebar badge (lightweight, no LLM call)
         fetch('/api/graph/stats')
           .then(r=>r.json())
-          .then(d=>{document.getElementById('health-badge').textContent = `📊 ${d.nodes}页 ${d.edges}链`})
-          .catch(()=>{document.getElementById('health-badge').textContent = '⚪'})
+          .then(d=>{document.getElementById('health-badge').textContent = '📊 '+d.nodes+'页 '+d.edges+'链'})
+          .catch(function(){document.getElementById('health-badge').textContent = '⚪'})
     </script>
 </body>
 </html>
