@@ -97,11 +97,12 @@ def _collect_existing_pages() -> str:
     for title in titles:
         page = read_page(title)
         if page:
-            parts.append(f"### {title}\n\n{page.content[:2000]}")
-            if len(page.content) > 2000:
+            # give more context per page so LLM can avoid duplicates
+            parts.append(f"### {title}\n\n{page.content[:4000]}")
+            if len(page.content) > 4000:
                 parts[-1] += "\n\n_(truncated)_"
-    # guard against huge context
-    full = "\n\n---\n\n".join(parts[:20])
+    # allow up to 50 pages of context
+    full = "\n\n---\n\n".join(parts[:50])
     return full
 
 
