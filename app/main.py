@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Query, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -200,12 +200,23 @@ async def api_ingest_single_file(filename: str, request: Request):
 
 
 @app.get("/api/raw/file-content")
-async def api_read_raw_file(path: str = Query(..., description="Relative path to the raw source file")):
+async def api_read_raw_file(request: Request):
     """Read the content of a raw source file for preview. Use ?path=... query parameter."""
-    from core.wiki_io import read_source
-    content = read_source(path)
-    if content is None:
-        return JSONResponse({"error": "file not found: " + path}, status_code=404)
+    path = request.query_params.get("path", "")
+    if not path:
+        return JSONResponse({"error": "missing ?path= parameter"}, status_code=400)
+    settings = get_settings()
+    fp = settings.raw_root / path
+    logger.info("Preview request: path=%s, raw_root=%s, full=%s, exists=%s", path, settings.raw_root, fp, fp.exists())
+    if not fp.exists():
+        return JSONResponse(
+            {"error": "file not found", "path": path, "looked_in": str(fp)},
+            status_code=404,
+        )
+    try:
+        content = fp.read_text(encoding="utf-8")
+    except Exception as exc:
+        return JSONResponse({"error": "read failed: " + str(exc), "path": path}, status_code=500)
     return {"path": path, "content": content, "size": len(content)}
 
 
