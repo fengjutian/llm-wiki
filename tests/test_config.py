@@ -1,4 +1,4 @@
-"""Tests for core/config.py."""
+﻿"""Tests for core/config.py."""
 
 import os
 from pathlib import Path
@@ -16,7 +16,7 @@ class TestSettings:
         assert s.raw_path == "./raw"
         assert s.wiki_branch == "main"
         assert s.git_auto_commit is True
-        assert s.llm_model == "gpt-4o"
+        assert s.llm_model == "deepseek-v4-pro"
         assert s.llm_max_retries == 3
 
     def test_wiki_root_property(self):
@@ -53,3 +53,5 @@ class TestSettingsFromEnv:
         s = Settings()
         assert s.wiki_path == "/custom/wiki"
         assert s.llm_model == "deepseek-chat"
+
+

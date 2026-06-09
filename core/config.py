@@ -97,12 +97,12 @@ class Settings(BaseSettings):
         return Path(self.schema_path).resolve()
 
     @property
-    def small_llm_api_base(self) -> str:
+    def resolved_small_api_base(self) -> str:
         """Fall back to primary API base if small-model base is not set."""
         return self.llm_small_api_base or self.llm_api_base
 
     @property
-    def small_llm_api_key(self) -> str:
+    def resolved_small_api_key(self) -> str:
         """Fall back to primary API key if small-model key is not set."""
         return self.llm_small_api_key or self.llm_api_key
 
@@ -130,12 +130,18 @@ def load_user_config() -> dict:
 
 def save_user_config(data: dict) -> None:
     """Persist user configuration to settings.json (whitelisted keys only).
-    Also clears the settings cache so next get_settings() picks up changes.
+
+    Clears both the settings cache AND the LLM client cache so new credentials
+    take effect immediately.
     """
     import json
     filtered = {k: v for k, v in data.items() if k in _USER_CONFIG_KEYS and v}
     SETTINGS_FILE.write_text(json.dumps(filtered, indent=2, ensure_ascii=False), encoding="utf-8")
     get_settings.cache_clear()
+
+    # also force-recreate the LLM client so it picks up the new API key
+    from core.llm import get_llm_client
+    get_llm_client.cache_clear()
 
 
 @lru_cache

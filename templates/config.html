@@ -22,6 +22,14 @@
             <label style="color:var(--muted);font-size:12px">轻量模型（摘要等简单任务）</label>
             <input type="text" id="cfg-small-model" placeholder="deepseek-chat">
         </div>
+        <div>
+            <label style="color:var(--muted);font-size:12px">轻量模型 API Base（留空复用上面的）</label>
+            <input type="text" id="cfg-small-base" placeholder="留空则复用主 API Base">
+        </div>
+        <div>
+            <label style="color:var(--muted);font-size:12px">轻量模型 API Key（留空复用上面的）</label>
+            <input type="password" id="cfg-small-key" placeholder="留空则复用主 API Key">
+        </div>
         <div style="display:flex;gap:12px">
             <div style="flex:1">
                 <label style="color:var(--muted);font-size:12px">Max Tokens</label>
@@ -53,10 +61,12 @@ async function loadConfig(){
     document.getElementById('cfg-model').value = d.llm_model || '';
     document.getElementById('cfg-key').placeholder = d.has_key ? '(已保存，重新输入覆盖)' : 'sk-...';
     document.getElementById('cfg-small-model').value = d.llm_small_model || '';
+    document.getElementById('cfg-small-base').value = d.llm_small_api_base || '';
+    document.getElementById('cfg-small-key').placeholder = d.has_small_key ? '(已保存)' : '留空则复用主 API Key';
     document.getElementById('cfg-max-tokens').value = d.llm_max_tokens || '';
     document.getElementById('cfg-temp').value = d.llm_temperature || '';
     document.getElementById('current-config').innerHTML =
-        `<p>模型: <strong>${d.llm_model}</strong> | Base: ${d.llm_api_base} | API Key: ${d.has_key?'已配置':'❌ 未配置'} | 来源: ${d.source}</p>`;
+        `<p>模型: <strong>${d.llm_model}</strong> | Base: ${d.llm_api_base} | 小模型: ${d.llm_small_model} | 来源: ${d.source}</p>`;
     document.getElementById('current-config').classList.remove('loading');
 }
 async function saveConfig(){
@@ -64,11 +74,14 @@ async function saveConfig(){
         llm_api_base: document.getElementById('cfg-base').value.trim(),
         llm_model: document.getElementById('cfg-model').value.trim(),
         llm_small_model: document.getElementById('cfg-small-model').value.trim(),
+        llm_small_api_base: document.getElementById('cfg-small-base').value.trim(),
         llm_max_tokens: parseInt(document.getElementById('cfg-max-tokens').value)||16384,
         llm_temperature: parseFloat(document.getElementById('cfg-temp').value)||0.3,
     };
     const key = document.getElementById('cfg-key').value.trim();
     if(key) data.llm_api_key = key;
+    const smallKey = document.getElementById('cfg-small-key').value.trim();
+    if(smallKey) data.llm_small_api_key = smallKey;
     const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const d = await r.json();
     document.getElementById('config-msg').innerHTML =
@@ -76,14 +89,14 @@ async function saveConfig(){
     loadConfig();
 }
 async function testConnection(){
-    document.getElementById('config-msg').innerHTML = '<span style="color:var(--yellow)">⏳ 测试中...</span>';
-    const resp = await fetch('/api/wiki/lint',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
-        .then(r=>r.json()).catch(()=>null);
-    if(resp && resp.health_score) {
-        document.getElementById('config-msg').innerHTML = '<span style="color:var(--green)">✅ 连接成功！模型可用。</span>';
+    document.getElementById('config-msg').innerHTML = '<span style="color:var(--yellow)">⏳ 发送测试请求...</span>';
+    const r = await fetch('/api/config/test').then(r=>r.json()).catch(e=>({ok:false,error:e.message}));
+    if(r.ok) {
+        document.getElementById('config-msg').innerHTML =
+            `<span style="color:var(--green)">✅ 连接成功！模型: ${r.model} | 延迟: ${r.latency_ms}ms | 回复: "${r.reply_preview}"</span>`;
     } else {
         document.getElementById('config-msg').innerHTML =
-            `<span style="color:var(--red)">❌ 连接失败，请检查 API Key 和 Base URL。</span>`;
+            `<span style="color:var(--red)">❌ 连接失败 (${r.latency_ms}ms): ${r.error}</span>`;
     }
 }
 loadConfig();

@@ -1,0 +1,10 @@
+{
+  "llm_api_base": "https://api.deepseek.com",
+  "llm_model": "deepseek-v4-pro",
+  "llm_small_model": "MiniMax-M3",
+  "llm_small_api_base": "https://api.minimaxi.com/v1",
+  "llm_max_tokens": 16384,
+  "llm_temperature": 0.3,
+  "llm_api_key": "",
+  "llm_small_api_key": ""
+}

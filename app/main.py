@@ -1,4 +1,4 @@
-"""LLM Wiki – FastAPI application entry point."""
+﻿"""LLM Wiki 鈥?FastAPI application entry point."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -50,7 +50,7 @@ app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 # ============================================================================
-# Template helper (no request in context – avoids "unhashable type: dict")
+# Template helper (no request in context 鈥?avoids "unhashable type: dict")
 # ============================================================================
 
 def _render(template_name: str, context: dict | None = None) -> HTMLResponse:
@@ -66,7 +66,7 @@ def _render(template_name: str, context: dict | None = None) -> HTMLResponse:
 
 
 # ============================================================================
-# API – Wiki core
+# API 鈥?Wiki core
 # ============================================================================
 
 from api.wiki import ingest_source, query_wiki, lint_wiki  # noqa: E402
@@ -234,9 +234,11 @@ async def api_get_config():
         "llm_model": s.llm_model,
         "llm_api_key": s.llm_api_key[:8] + "***" if s.llm_api_key else "",
         "llm_small_model": s.llm_small_model or s.llm_model,
+        "llm_small_api_base": s.resolved_small_api_base,
         "llm_max_tokens": s.llm_max_tokens,
         "llm_temperature": s.llm_temperature,
         "has_key": bool(s.llm_api_key),
+        "has_small_key": bool(s.llm_small_api_key),
         "source": "settings.json" if user else "env / defaults",
     }
 
@@ -248,6 +250,47 @@ async def api_save_config(request: Request):
     save_user_config(body)
     logger.info("Configuration saved: model=%s base=%s", body.get("llm_model"), body.get("llm_api_base"))
     return {"status": "saved", "model": body.get("llm_model"), "base": body.get("llm_api_base")}
+
+
+@app.get("/api/config/test")
+async def api_test_connection():
+    """Test LLM connectivity by sending a tiny chat completion request.
+
+    Returns the model name, response preview, and latency.
+    """
+    import time
+    from core.llm import get_llm_client
+
+    settings = get_settings()
+    if not settings.llm_api_key:
+        return {"ok": False, "error": "API Key 鏈厤缃紝璇峰厛淇濆瓨閰嶇疆"}
+
+    client = get_llm_client()
+    t0 = time.time()
+    try:
+        reply = client.chat_completion(
+            messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+            task="query",
+            max_tokens=10,
+            temperature=0,
+        )
+        elapsed = round((time.time() - t0) * 1000)
+        return {
+            "ok": True,
+            "model": settings.llm_model,
+            "base": settings.llm_api_base,
+            "reply_preview": reply.strip()[:100],
+            "latency_ms": elapsed,
+        }
+    except Exception as exc:
+        elapsed = round((time.time() - t0) * 1000)
+        return {
+            "ok": False,
+            "model": settings.llm_model,
+            "base": settings.llm_api_base,
+            "error": str(exc),
+            "latency_ms": elapsed,
+        }
 
 
 # ============================================================================
@@ -321,3 +364,4 @@ async def health():
 @app.get("/config", response_class=HTMLResponse)
 async def page_config(request: Request):
     return _render("config.html")
+
