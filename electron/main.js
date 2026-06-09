@@ -18,8 +18,6 @@ const DEV_MODE = !app.isPackaged;
 let pythonProcess = null;
 
 function findPython() {
-  // Try common Python commands
-  const candidates = ['python', 'python3', 'py'];
   // In packaged mode, use bundled Python
   if (!DEV_MODE) {
     const bundled = process.platform === 'win32'
@@ -27,6 +25,23 @@ function findPython() {
       : path.join(process.resourcesPath, 'python-dist', 'bin', 'python3');
     return bundled;
   }
+  // In dev mode, use Poetry's virtual environment Python
+  const venvPath = process.platform === 'win32'
+    ? path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'pypoetry', 'Cache', 'virtualenvs')
+    : path.join(process.env.HOME || '', '.cache', 'pypoetry', 'virtualenvs');
+  const fs = require('fs');
+  if (fs.existsSync(venvPath)) {
+    const dirs = fs.readdirSync(venvPath).filter(d => d.startsWith('llm-wiki-1-'));
+    if (dirs.length > 0) {
+      const pythonExe = process.platform === 'win32'
+        ? path.join(venvPath, dirs[0], 'Scripts', 'python.exe')
+        : path.join(venvPath, dirs[0], 'bin', 'python3');
+      if (fs.existsSync(pythonExe)) {
+        return pythonExe;
+      }
+    }
+  }
+  // Fallback to system python
   return 'python';
 }
 

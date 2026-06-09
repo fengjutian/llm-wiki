@@ -179,3 +179,7 @@ poetry run uvicorn app.main:app --reload --port 8080
 > *"The tedious part of maintaining a knowledge base is not the reading or the thinking — it's the bookkeeping. LLMs don't get bored, don't forget to update a cross-reference, and can touch 15 files in one pass."*
 >
 > — Andrej Karpathy
+
+
+$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+npm run build:win
