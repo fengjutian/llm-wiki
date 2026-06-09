@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Query, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -197,6 +197,16 @@ async def api_ingest_single_file(filename: str, request: Request):
         "dry_run": result.dry_run,
         "errors": result.errors,
     }
+
+
+@app.get("/api/raw/file-content")
+async def api_read_raw_file(path: str = Query(..., description="Relative path to the raw source file")):
+    """Read the content of a raw source file for preview. Use ?path=... query parameter."""
+    from core.wiki_io import read_source
+    content = read_source(path)
+    if content is None:
+        return JSONResponse({"error": "file not found: " + path}, status_code=404)
+    return {"path": path, "content": content, "size": len(content)}
 
 
 def _get_ingested_hashes() -> dict[str, str]:

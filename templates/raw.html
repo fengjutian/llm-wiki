@@ -6,6 +6,7 @@
     <div class="card-header card-header-row">
         <span>所有上传的源文档</span>
         <div class="header-actions">
+            <button class="btn btn-primary btn-sm" onclick="openUploadModal()">📤 上传文件</button>
             <button class="btn btn-primary btn-sm" onclick="batchIngest()" id="btn-batch">🚀 全部 AI 生成 Wiki</button>
             <label class="dry-run-label">
                 <input type="checkbox" id="dry-run-batch"> Dry-run
@@ -17,13 +18,45 @@
 
 <!-- Ingest Result Modal -->
 <div id="result-modal" class="modal modal-hidden">
-    <div class="modal-overlay" onclick="closeModal()"></div>
+    <div class="modal-overlay" onclick="closeResultModal()"></div>
     <div class="modal-content card">
         <div class="card-header card-header-row">
             <span id="modal-title">Ingest 结果</span>
-            <button class="btn btn-sm" onclick="closeModal()">✕</button>
+            <button class="btn btn-sm" onclick="closeResultModal()">✕</button>
         </div>
         <div id="modal-body"></div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="preview-modal" class="modal modal-hidden">
+    <div class="modal-overlay" onclick="closePreviewModal()"></div>
+    <div class="modal-content card" style="max-width:900px">
+        <div class="card-header card-header-row">
+            <span id="preview-title">📄 文件预览</span>
+            <button class="btn btn-sm" onclick="closePreviewModal()">✕</button>
+        </div>
+        <div style="margin-bottom:8px;font-size:12px;color:var(--muted)" id="preview-meta"></div>
+        <pre id="preview-content" style="max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-word">加载中...</pre>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="modal modal-hidden">
+    <div class="modal-overlay" onclick="closeUploadModal()"></div>
+    <div class="modal-content card" style="max-width:520px">
+        <div class="card-header card-header-row">
+            <span>📤 上传源文件</span>
+            <button class="btn btn-sm" onclick="closeUploadModal()">✕</button>
+        </div>
+        <div id="upload-drop-zone" style="border:2px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;transition:all .2s;cursor:pointer;margin-bottom:12px">
+            <div style="font-size:36px;margin-bottom:8px">📂</div>
+            <div style="color:var(--text);font-weight:500;margin-bottom:4px">拖拽文件到此处</div>
+            <div style="color:var(--muted);font-size:12px">或点击选择文件</div>
+            <input type="file" id="upload-input" style="display:none" multiple>
+        </div>
+        <div id="upload-queue" style="max-height:200px;overflow-y:auto"></div>
+        <div id="upload-status" style="margin-top:8px;font-size:13px;color:var(--muted)"></div>
     </div>
 </div>
 {% endblock %}
@@ -49,6 +82,13 @@
 .wiki-links{font-size:12px;color:var(--muted);margin-top:4px}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
+#upload-drop-zone.drag-over{border-color:var(--accent);background:rgba(88,166,255,.08)}
+.upload-queue-item{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin:4px 0;border-radius:4px;background:var(--surface);border:1px solid var(--border);font-size:13px}
+.upload-queue-item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px}
+.upload-queue-item .size{color:var(--muted);font-size:12px;margin-right:8px;flex-shrink:0}
+.upload-queue-item .status{font-size:12px;flex-shrink:0}
+.upload-queue-item .status.ok{color:var(--green)}
+.upload-queue-item .status.err{color:var(--red)}
 </style>
 {% endblock %}
 {% block scripts %}
@@ -62,7 +102,6 @@ function formatSize(bytes) {
 }
 
 function safeId(str) {
-    // Create a safe DOM id from any string (handles Unicode)
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         const c = str.charCodeAt(i);
@@ -72,43 +111,146 @@ function safeId(str) {
     return 'f' + Math.abs(hash).toString(36);
 }
 
+// ===================================================================
+// File List
+// ===================================================================
+
 async function loadFiles() {
     const container = document.getElementById('file-list');
     try {
         const resp = await fetch('/api/raw/files');
         const data = await resp.json();
         if (data.files.length === 0) {
-            container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">暂无源文件。请先 <a href="/ingest">上传文件</a>。</p>';
+            container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">暂无源文件，点击 <b>📤 上传文件</b> 开始。</p>';
             container.classList.remove('loading');
             return;
         }
         let html = '';
-        data.files.forEach((f, idx) => {
+        data.files.forEach((f) => {
             const statusClass = 'status-' + f.status;
             const rowId = safeId(f.path);
-            html += `<div class="file-row" id="row-${rowId}">
-                <div class="file-info">
-                    <div class="file-name">📄 ${escapeHtml(f.path)}</div>
-                    <div class="file-meta">${formatSize(f.size)} · <code>${escapeHtml(f.hash)}</code></div>
-                    <div class="wiki-links">
-                        <span class="status-badge ${statusClass}">${statusLabels[f.status] || f.status}</span>
-                        ${f.wiki_pages.length ? ' → ' + f.wiki_pages.map(p => `<a href="/page/${encodeURIComponent(p)}">[[${escapeHtml(p)}]]</a>`).join(', ') : ''}
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <button class="btn btn-sm btn-primary" onclick="ingestFile('${escapeJs(f.path)}', '${rowId}')" id="btn-${rowId}">
-                        🤖 ${f.status === 'ingested' ? '重新生成' : 'AI 生成 Wiki'}
-                    </button>
-                </div>
-            </div>`;
+            html += '<div class="file-row" id="row-' + rowId + '">' +
+                '<div class="file-info">' +
+                    '<div class="file-name">📄 ' + escapeHtml(f.path) + '</div>' +
+                    '<div class="file-meta">' + formatSize(f.size) + ' · <code>' + escapeHtml(f.hash) + '</code></div>' +
+                    '<div class="wiki-links">' +
+                        '<span class="status-badge ' + statusClass + '">' + (statusLabels[f.status] || f.status) + '</span>' +
+                        (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<a href="/page/' + encodeURIComponent(p) + '">[[' + escapeHtml(p) + ']]</a>'}).join(', ') : '') +
+                    '</div>' +
+                '</div>' +
+                '<div class="file-actions">' +
+                    '<button class="btn btn-sm" onclick="previewFile(\'' + escapeJs(f.path) + '\')" title="预览文件内容">👁 预览</button>' +
+                    '<button class="btn btn-sm btn-primary" onclick="ingestFile(\'' + escapeJs(f.path) + '\', \'' + rowId + '\')" id="btn-' + rowId + '">' +
+                        '🤖 ' + (f.status === 'ingested' ? '重新生成' : 'AI 生成 Wiki') +
+                    '</button>' +
+                '</div>' +
+            '</div>';
         });
         container.innerHTML = html;
         container.classList.remove('loading');
     } catch(e) {
-        container.innerHTML = `<p class="error">加载失败: ${e.message}</p>`;
+        container.innerHTML = '<p class="error">加载失败: ' + e.message + '</p>';
         container.classList.remove('loading');
     }
 }
+
+// ===================================================================
+// Preview
+// ===================================================================
+
+async function previewFile(filename) {
+    document.getElementById('preview-title').textContent = '📄 ' + filename;
+    document.getElementById('preview-meta').textContent = '';
+    document.getElementById('preview-content').textContent = '加载中...';
+    document.getElementById('preview-modal').classList.remove('modal-hidden');
+
+    try {
+        const resp = await fetch('/api/raw/file-content?path=' + encodeURIComponent(filename));
+        if (!resp.ok) { throw new Error('文件不存在 (' + resp.status + ')'); }
+        const data = await resp.json();
+        document.getElementById('preview-meta').textContent = '大小: ' + formatSize(data.size) + ' · ' + data.content.split('\n').length + ' 行';
+        document.getElementById('preview-content').textContent = data.content;
+    } catch(e) {
+        document.getElementById('preview-content').textContent = '加载失败: ' + e.message;
+    }
+}
+
+function closePreviewModal() {
+    document.getElementById('preview-modal').classList.add('modal-hidden');
+}
+
+// ===================================================================
+// Upload
+// ===================================================================
+
+function openUploadModal() {
+    document.getElementById('upload-queue').innerHTML = '';
+    document.getElementById('upload-status').textContent = '';
+    document.getElementById('upload-input').value = '';
+    document.getElementById('upload-modal').classList.remove('modal-hidden');
+}
+
+function closeUploadModal() {
+    document.getElementById('upload-modal').classList.add('modal-hidden');
+}
+
+// Drag & drop
+(function(){
+    var zone = document.getElementById('upload-drop-zone');
+    if (!zone) return;
+    var input = document.getElementById('upload-input');
+
+    zone.addEventListener('click', function(){ input.click(); });
+    input.addEventListener('change', function(){ handleFiles(input.files); });
+
+    zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', function(e){ e.preventDefault(); zone.classList.remove('drag-over'); });
+    zone.addEventListener('drop', function(e){
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+    });
+})();
+
+function handleFiles(files) {
+    for (var i = 0; i < files.length; i++) {
+        uploadFile(files[i]);
+    }
+}
+
+async function uploadFile(file) {
+    var queue = document.getElementById('upload-queue');
+    var itemId = 'uq-' + safeId(file.name + Date.now());
+    var item = document.createElement('div');
+    item.className = 'upload-queue-item';
+    item.id = itemId;
+    item.innerHTML = '<span class="name">' + escapeHtml(file.name) + '</span>' +
+        '<span class="size">' + formatSize(file.size) + '</span>' +
+        '<span class="status"><span class="spinner"></span></span>';
+    queue.appendChild(item);
+
+    var formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        var resp = await fetch('/api/raw/upload', { method: 'POST', body: formData });
+        var data = await resp.json();
+        if (data.status === 'uploaded') {
+            document.getElementById(itemId).querySelector('.status').innerHTML = '<span class="ok">✅ 已上传</span>';
+        } else {
+            document.getElementById(itemId).querySelector('.status').innerHTML = '<span class="err">❌ 失败</span>';
+        }
+    } catch(e) {
+        document.getElementById(itemId).querySelector('.status').innerHTML = '<span class="err">❌ ' + e.message + '</span>';
+    }
+
+    document.getElementById('upload-status').textContent = '上传完成，刷新列表中...';
+    loadFiles();
+}
+
+// ===================================================================
+// Ingest
+// ===================================================================
 
 async function ingestFile(filename, rowId) {
     const dryRun = document.getElementById('dry-run-batch').checked;
@@ -119,7 +261,7 @@ async function ingestFile(filename, rowId) {
     btn.innerHTML = '<span class="spinner"></span> AI 处理中（最长等待 3 分钟）...';
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
+    const timeoutId = setTimeout(function(){ controller.abort(); }, 180000);
 
     try {
         const resp = await fetch('/api/raw/ingest/' + encodeURIComponent(filename), {
@@ -131,7 +273,7 @@ async function ingestFile(filename, rowId) {
         clearTimeout(timeoutId);
         const data = await resp.json();
         showResult(filename, data);
-        loadFiles(); // refresh list
+        loadFiles();
     } catch(e) {
         clearTimeout(timeoutId);
         if (e.name === 'AbortError') {
@@ -157,11 +299,11 @@ async function batchIngest() {
             body: JSON.stringify({dry_run: dryRun})
         });
         const data = await resp.json();
-        let html = `<p><strong>已处理 ${data.processed} 个文件</strong></p><ul>`;
-        data.results.forEach(r => {
+        let html = '<p><strong>已处理 ' + data.processed + ' 个文件</strong></p><ul>';
+        data.results.forEach(function(r){
             const icon = r.status === 'skipped' ? '⏭️' : r.errors.length ? '❌' : '✅';
-            html += `<li>${icon} <strong>${escapeHtml(r.source)}</strong> — ${r.status} | 新增 ${r.new_pages} 页，更新 ${r.updated_pages} 页`;
-            if (r.errors.length) html += `<br><span class="error">${r.errors.join(', ')}</span>`;
+            html += '<li>' + icon + ' <strong>' + escapeHtml(r.source) + '</strong> — ' + r.status + ' | 新增 ' + r.new_pages + ' 页，更新 ' + r.updated_pages + ' 页';
+            if (r.errors.length) html += '<br><span class="error">' + r.errors.join(', ') + '</span>';
             html += '</li>';
         });
         html += '</ul>';
@@ -179,23 +321,27 @@ function showResult(title, data) {
     if (data.html) {
         html = data.html;
     } else {
-        html += `<p><strong>状态:</strong> ${data.status || 'unknown'}</p>`;
-        if (data.new_pages && data.new_pages.length) html += `<p><strong>新增页面 (${data.new_pages.length}):</strong> ${data.new_pages.map(p => `<a href="/page/${encodeURIComponent(p)}">${escapeHtml(p)}</a>`).join(', ')}</p>`;
-        if (data.updated_pages && data.updated_pages.length) html += `<p><strong>更新页面 (${data.updated_pages.length}):</strong> ${data.updated_pages.map(p => `<a href="/page/${encodeURIComponent(p)}">${escapeHtml(p)}</a>`).join(', ')}</p>`;
-        if (data.contradictions && data.contradictions.length) html += `<p><strong>⚠️ 矛盾 (${data.contradictions.length}):</strong></p><ul>${data.contradictions.map(c => `<li>${escapeHtml(c.wiki_page || '')}: ${escapeHtml(c.claim_in_source || '')}</li>`).join('')}</ul>`;
-        if (data.errors && data.errors.length) html += `<p class="error">${data.errors.map(escapeHtml).join('<br>')}</p>`;
+        html += '<p><strong>状态:</strong> ' + (data.status || 'unknown') + '</p>';
+        if (data.new_pages && data.new_pages.length) html += '<p><strong>新增页面 (' + data.new_pages.length + '):</strong> ' + data.new_pages.map(function(p){return '<a href="/page/' + encodeURIComponent(p) + '">' + escapeHtml(p) + '</a>'}).join(', ') + '</p>';
+        if (data.updated_pages && data.updated_pages.length) html += '<p><strong>更新页面 (' + data.updated_pages.length + '):</strong> ' + data.updated_pages.map(function(p){return '<a href="/page/' + encodeURIComponent(p) + '">' + escapeHtml(p) + '</a>'}).join(', ') + '</p>';
+        if (data.contradictions && data.contradictions.length) html += '<p><strong>⚠️ 矛盾 (' + data.contradictions.length + '):</strong></p><ul>' + data.contradictions.map(function(c){return '<li>' + escapeHtml(c.wiki_page || '') + ': ' + escapeHtml(c.claim_in_source || '') + '</li>'}).join('') + '</ul>';
+        if (data.errors && data.errors.length) html += '<p class="error">' + data.errors.map(escapeHtml).join('<br>') + '</p>';
         if (data.dry_run) html += '<p style="color:var(--yellow)">⚠️ 这是 Dry-run 预览，未实际写入。</p>';
     }
     document.getElementById('modal-body').innerHTML = html;
     document.getElementById('result-modal').classList.remove('modal-hidden');
 }
 
-function closeModal() {
+function closeResultModal() {
     document.getElementById('result-modal').classList.add('modal-hidden');
 }
 
+// ===================================================================
+// Helpers
+// ===================================================================
+
 function escapeHtml(s) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
 }
@@ -203,6 +349,15 @@ function escapeHtml(s) {
 function escapeJs(s) {
     return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
 }
+
+// Close modals on Escape key
+document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') {
+        closeResultModal();
+        closePreviewModal();
+        closeUploadModal();
+    }
+});
 
 loadFiles();
 </script>
