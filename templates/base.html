@@ -72,6 +72,64 @@
           .then(r=>r.json())
           .then(d=>{document.getElementById('health-badge').textContent = '📊 '+d.nodes+'页 '+d.edges+'链'})
           .catch(function(){document.getElementById('health-badge').textContent = '⚪'})
+
+        // ================================================================
+        // Global toast notification (for background tasks completing)
+        // ================================================================
+        function showToast(msg, link, linkText) {
+            var existing = document.getElementById('global-toast');
+            if (existing) existing.remove();
+            var toast = document.createElement('div');
+            toast.id = 'global-toast';
+            toast.innerHTML =
+                '<span>' + msg + '</span>' +
+                (link ? ' <a href="' + link + '" style="color:var(--accent);font-weight:600">' + (linkText||'查看') + '</a>' : '') +
+                '<button onclick="this.parentElement.remove()" style="margin-left:12px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">&times;</button>';
+            document.body.appendChild(toast);
+            setTimeout(function(){ if (toast.parentElement) toast.remove(); }, 10000);
+        }
+
+        // Listen for lint-done event (fired by lint.html when poll completes on that page)
+        window.addEventListener('lint-done', function(e) {
+            var d = e.detail;
+            var msg = '✅ Lint 完成！健康评分: ' + d.health_score + ' · ' + (d.issues||[]).length + ' 个问题';
+            showToast(msg, '/lint', '查看详情');
+        });
+
+        // Also check sessionStorage for pending lint tasks (cross-page)
+        (function(){
+            var pending = sessionStorage.getItem('lint_pending_task');
+            if (pending) {
+                showToast('🔍 Lint 检查进行中… 可正常浏览其他页面', null, null);
+                // Start polling in background
+                try {
+                    var t = JSON.parse(pending);
+                    pollInBackground(t.taskId);
+                } catch(e) {}
+            }
+        })();
+
+        function pollInBackground(taskId) {
+            fetch('/api/wiki/lint/status/' + taskId)
+              .then(function(r){ return r.json(); })
+              .then(function(data) {
+                  if (data.status === 'done' && data.result) {
+                      sessionStorage.removeItem('lint_pending_task');
+                      sessionStorage.setItem('lint_last_result', JSON.stringify(data.result));
+                      var d = data.result;
+                      var msg = '✅ Lint 完成！健康评分: ' + d.health_score + ' · ' + (d.issues||[]).length + ' 个问题';
+                      showToast(msg, '/lint', '查看详情');
+                  } else if (data.status === 'error') {
+                      sessionStorage.removeItem('lint_pending_task');
+                      showToast('❌ Lint 检查失败: ' + (data.error||'unknown'), null, null);
+                  } else {
+                      setTimeout(function(){ pollInBackground(taskId); }, 3000);
+                  }
+              })
+              .catch(function() {
+                  setTimeout(function(){ pollInBackground(taskId); }, 5000);
+              });
+        }
     </script>
 </body>
 </html>

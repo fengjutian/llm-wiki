@@ -104,6 +104,8 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent)}
 .health-score{font-size:48px;font-weight:700;text-align:center;padding:20px}
 
 .loading{text-align:center;padding:40px;color:var(--muted)}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
 .error{color:var(--red);padding:12px;background:rgba(248,81,73,.1);border-radius:6px}
 
 /* ===================================================================
@@ -114,6 +116,19 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent)}
 .modal-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6)}
 .modal-content{position:relative;max-width:640px;width:90%;max-height:80vh;overflow-y:auto;z-index:1}
 .card-header-row{display:flex;justify-content:space-between;align-items:center}
+
+/* Global toast notification */
+#global-toast{
+    position:fixed;bottom:24px;right:24px;z-index:200;
+    background:var(--surface);border:1px solid var(--accent);
+    border-radius:var(--radius);padding:12px 18px;
+    font-size:13px;color:var(--text);
+    box-shadow:0 4px 24px rgba(0,0,0,.4);
+    display:flex;align-items:center;gap:8px;
+    animation:toast-in .3s ease;
+    max-width:480px;
+}
+@keyframes toast-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
 @media(max-width:768px){
   .sidebar{width:100%;position:static;flex-direction:row;overflow-x:auto}

@@ -1,8 +1,11 @@
-﻿"""LLM Wiki 鈥?FastAPI application entry point."""
+﻿"""LLM Wiki – FastAPI application entry point."""
 
+import asyncio
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+# ---------------------------------------------------------------------------
+# Background task store (lint, ingest, etc.)
+# ---------------------------------------------------------------------------
+_bg_tasks: dict[str, dict] = {}
 
 
 @asynccontextmanager
@@ -287,13 +295,63 @@ async def api_query(request: Request):
 
 @app.post("/api/wiki/lint")
 async def api_lint(request: Request):
+    """Start a lint health-check in the background.
+
+    Query param `?async=1` or JSON `{"async": true}` to run non-blocking.
+    Returns `{"task_id": "...", "status": "started"}` for async mode,
+    or the full report for sync mode (backward-compatible).
+    """
     body = await request.json() if await request.body() else {}
-    report = lint_wiki(auto_fix=body.get("auto_fix", False))
-    return {
-        "health_score": report.health_score,
-        "issues": [{"severity": i.severity, "type": i.type, "description": i.description, "affected_pages": i.affected_pages, "suggestion": i.suggestion, "auto_fixable": i.auto_fixable} for i in report.issues],
-        "stats": report.stats, "summary": report.summary,
-    }
+    auto_fix = body.get("auto_fix", False)
+    use_async = body.get("async", True)  # default async for UI
+
+    if not use_async:
+        report = lint_wiki(auto_fix=auto_fix)
+        return {
+            "health_score": report.health_score,
+            "issues": [{"severity": i.severity, "type": i.type, "description": i.description,
+                        "affected_pages": i.affected_pages, "suggestion": i.suggestion,
+                        "auto_fixable": i.auto_fixable} for i in report.issues],
+            "stats": report.stats, "summary": report.summary,
+        }
+
+    # Async mode: start background task
+    task_id = uuid.uuid4().hex[:12]
+    _bg_tasks[task_id] = {"status": "running", "result": None, "error": None}
+
+    async def _run():
+        try:
+            loop = asyncio.get_running_loop()
+            from functools import partial
+            fn = partial(lint_wiki, auto_fix=auto_fix)
+            report = await loop.run_in_executor(None, fn)
+            _bg_tasks[task_id] = {
+                "status": "done",
+                "result": {
+                    "health_score": report.health_score,
+                    "issues": [{"severity": i.severity, "type": i.type, "description": i.description,
+                                "affected_pages": i.affected_pages, "suggestion": i.suggestion,
+                                "auto_fixable": i.auto_fixable} for i in report.issues],
+                    "stats": report.stats, "summary": report.summary,
+                },
+                "error": None,
+            }
+        except Exception as exc:
+            logger.exception("Background lint failed")
+            _bg_tasks[task_id] = {"status": "error", "result": None, "error": str(exc)}
+
+    asyncio.create_task(_run())
+    return {"task_id": task_id, "status": "started"}
+
+
+@app.get("/api/wiki/lint/status/{task_id}")
+async def api_lint_status(task_id: str):
+    """Poll the status of a background lint task."""
+    task = _bg_tasks.get(task_id)
+    if not task:
+        return JSONResponse({"error": "task not found"}, status_code=404)
+    return {"task_id": task_id, "status": task["status"],
+            "result": task.get("result"), "error": task.get("error")}
 
 
 @app.get("/api/wiki/pages")
