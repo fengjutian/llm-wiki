@@ -18,6 +18,9 @@
   "build": {
     "appId": "com.llm-wiki.app",
     "productName": "LLM Wiki",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "electron/**/*",
       "app/**/*",
@@ -34,7 +37,8 @@
     "extraResources": [
       {
         "from": "dist",
-        "to": "python-dist"
+        "to": "python-dist",
+        "filter": ["**/*", "!win-unpacked", "!win-ia32-unpacked", "!*-unpacked", "!builder-*.yml", "!builder-*.yaml"]
       }
     ],
     "win": {
