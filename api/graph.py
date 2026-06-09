@@ -1,5 +1,8 @@
 """Graph API endpoints – visualize and query the wiki knowledge graph."""
 
+import time
+import logging
+
 from fastapi import APIRouter, Query
 
 from core.graph_engine import (
@@ -10,13 +13,21 @@ from core.graph_engine import (
     hub_pages,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/graph", tags=["graph"])
 
 
 @router.get("")
-async def get_graph_data():
-    """Return full graph data (nodes + edges) for frontend visualization."""
-    G = get_graph(force_rebuild=True)
+async def get_graph_data(
+    force: bool = Query(False, description="Force rebuild the graph from wiki sources"),
+):
+    """Return full graph data (nodes + edges) for frontend visualization.
+
+    Uses the cached graph by default for fast responses.
+    Pass ?force=true to rebuild from source files.
+    """
+    t0 = time.time()
+    G = get_graph(force_rebuild=force)
     nodes = [
         {
             "id": n,
@@ -37,7 +48,9 @@ async def get_graph_data():
         }
         for u, v, data in G.edges(data=True)
     ]
-    return {"nodes": nodes, "edges": edges}
+    elapsed = round((time.time() - t0) * 1000)
+    logger.info("Graph data served in %d ms (%d nodes, %d edges, force=%s)", elapsed, len(nodes), len(edges), force)
+    return {"nodes": nodes, "edges": edges, "elapsed_ms": elapsed}
 
 
 @router.get("/paths")
@@ -53,17 +66,21 @@ async def get_paths(
 
 
 @router.get("/orphans")
-async def get_orphans():
+async def get_orphans(
+    force: bool = Query(False, description="Force rebuild the graph"),
+):
     """List pages with no incoming links."""
-    G = get_graph(force_rebuild=True)
+    G = get_graph(force_rebuild=force)
     orphans = find_orphans(G)
     return {"orphans": orphans, "count": len(orphans)}
 
 
 @router.get("/stats")
-async def get_stats():
-    """Return graph-level statistics."""
-    G = get_graph(force_rebuild=True)
+async def get_stats(
+    force: bool = Query(False, description="Force rebuild the graph"),
+):
+    """Return graph-level statistics. Uses cache by default."""
+    G = get_graph(force_rebuild=force)
     return graph_stats(G)
 
 

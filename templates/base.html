@@ -34,10 +34,10 @@
     </div>
     {% block scripts %}{% endblock %}
     <script>
-        // Load health status
-        fetch('/api/wiki/lint', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+        // Load wiki stats for the sidebar badge (lightweight, no LLM call)
+        fetch('/api/graph/stats')
           .then(r=>r.json())
-          .then(d=>{document.getElementById('health-badge').textContent = '🟢 健康: '+d.health_score})
+          .then(d=>{document.getElementById('health-badge').textContent = `📊 ${d.nodes}页 ${d.edges}链`})
           .catch(()=>{document.getElementById('health-badge').textContent = '⚪'})
     </script>
 </body>
