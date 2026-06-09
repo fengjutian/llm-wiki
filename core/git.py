@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from git import Repo, GitCommandError
+from git import Repo, GitCommandError, Actor
 
 from core.config import get_settings
 
@@ -71,13 +71,10 @@ def commit(repo: Repo, message: str) -> Optional[str]:
         return None
     settings = get_settings()
     repo.git.add(A=True)
-    commit = repo.index.commit(
-        message,
-        author=repo.author,
-        committer=repo.author,
-    )
-    logger.info("Committed  %s  %s", commit.hexsha[:8], message)
-    return commit.hexsha
+    actor = Actor(settings.git_author_name, settings.git_author_email)
+    commit_obj = repo.index.commit(message, author=actor, committer=actor)
+    logger.info("Committed  %s  %s", commit_obj.hexsha[:8], message)
+    return commit_obj.hexsha
 
 
 def log(repo: Repo, max_count: int = 20) -> list[CommitInfo]:
