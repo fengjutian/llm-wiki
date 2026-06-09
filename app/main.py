@@ -4,13 +4,14 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import aiofiles
 
-from core.config import get_settings
+from core.config import get_settings, load_user_config, save_user_config
 from core.git import open_wiki_repo
 from core.graph_engine import get_graph, invalidate_graph_cache
 
@@ -86,12 +87,62 @@ async def api_ingest(request: Request):
 
 @app.post("/api/wiki/ingest/batch")
 async def api_ingest_batch(request: Request):
+    """Batch ingest all pending sources in raw/, with optional exclude patterns.
+
+    Body: { "exclude": ["*.tmp", ".gitkeep", "draft/*"], "dry_run": false }
+    """
     from core.wiki_io import scan_sources
+    body = await request.json() if await request.body() else {}
+    exclude = body.get("exclude", [])
+    dry_run = body.get("dry_run", False)
+
+    sources = scan_sources(exclude_patterns=exclude)
     results = []
-    for src in scan_sources():
-        r = ingest_source(src.path)
-        results.append({"source": src.path, "status": r.status, "new_pages": len(r.new_pages), "updated_pages": len(r.updated_pages), "errors": r.errors})
+    for src in sources:
+        r = ingest_source(src.path, dry_run=dry_run)
+        results.append({
+            "source": src.path, "status": r.status,
+            "new_pages": len(r.new_pages), "updated_pages": len(r.updated_pages),
+            "errors": r.errors,
+        })
     return {"processed": len(results), "results": results}
+
+
+@app.post("/api/wiki/ingest/folder")
+async def api_ingest_folder(request: Request):
+    """Ingest a specific sub-folder, with optional exclude patterns.
+
+    Body: { "folder": "papers/", "exclude": ["*.tmp"], "dry_run": false }
+    """
+    from core.wiki_io import scan_sources
+    body = await request.json() if await request.body() else {}
+    folder = body.get("folder", "")
+    exclude = body.get("exclude", [])
+    dry_run = body.get("dry_run", False)
+
+    sources = scan_sources(folder=folder, exclude_patterns=exclude)
+    results = []
+    for src in sources:
+        r = ingest_source(src.path, dry_run=dry_run)
+        results.append({
+            "source": src.path, "status": r.status,
+            "new_pages": len(r.new_pages), "updated_pages": len(r.updated_pages),
+            "errors": r.errors,
+        })
+    return {"folder": folder, "processed": len(results), "results": results}
+
+
+@app.post("/api/raw/upload")
+async def api_upload_raw(file: UploadFile = File(...)):
+    """Upload a file to the raw/ directory."""
+    settings = get_settings()
+    settings.raw_root.mkdir(parents=True, exist_ok=True)
+    dest = settings.raw_root / file.filename
+    content = await file.read()
+    async with aiofiles.open(dest, "wb") as f:
+        await f.write(content)
+    logger.info("Uploaded raw file: %s (%d bytes)", file.filename, len(content))
+    return {"filename": file.filename, "size": len(content), "status": "uploaded"}
 
 
 @app.post("/api/wiki/query")
@@ -170,6 +221,36 @@ async def api_get_log(last_n: int = 20):
 
 
 # ============================================================================
+# Config API
+# ============================================================================
+
+@app.get("/api/config")
+async def api_get_config():
+    """Return current LLM configuration (API key masked)."""
+    s = get_settings()
+    user = load_user_config()
+    return {
+        "llm_api_base": s.llm_api_base,
+        "llm_model": s.llm_model,
+        "llm_api_key": s.llm_api_key[:8] + "***" if s.llm_api_key else "",
+        "llm_small_model": s.llm_small_model or s.llm_model,
+        "llm_max_tokens": s.llm_max_tokens,
+        "llm_temperature": s.llm_temperature,
+        "has_key": bool(s.llm_api_key),
+        "source": "settings.json" if user else "env / defaults",
+    }
+
+
+@app.post("/api/config")
+async def api_save_config(request: Request):
+    """Save LLM configuration. Clears settings cache so it takes effect immediately."""
+    body = await request.json()
+    save_user_config(body)
+    logger.info("Configuration saved: model=%s base=%s", body.get("llm_model"), body.get("llm_api_base"))
+    return {"status": "saved", "model": body.get("llm_model"), "base": body.get("llm_api_base")}
+
+
+# ============================================================================
 # Sub-routers
 # ============================================================================
 
@@ -236,3 +317,7 @@ async def page_branches(request: Request):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.get("/config", response_class=HTMLResponse)
+async def page_config(request: Request):
+    return _render("config.html")

@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # LLM – primary model (complex tasks: analysis, contradiction detection)
     # ------------------------------------------------------------------
-    llm_api_base: str = "https://api.openai.com/v1"
+    llm_api_base: str = "https://api.deepseek.com/v1"
     llm_api_key: str = ""
-    llm_model: str = "gpt-4o"
+    llm_model: str = "deepseek-v4-pro"
     llm_max_tokens: int = 16384
     llm_temperature: float = 0.3
     llm_max_retries: int = 3
@@ -107,7 +107,42 @@ class Settings(BaseSettings):
         return self.llm_small_api_key or self.llm_api_key
 
 
+SETTINGS_FILE = Path("settings.json")
+
+# Whitelist: only these keys are user-configurable via the web UI
+_USER_CONFIG_KEYS = {
+    "llm_api_base", "llm_api_key", "llm_model",
+    "llm_small_api_base", "llm_small_api_key", "llm_small_model",
+    "llm_max_tokens", "llm_temperature", "llm_max_retries",
+}
+
+
+def load_user_config() -> dict:
+    """Load user overrides from settings.json."""
+    if not SETTINGS_FILE.exists():
+        return {}
+    try:
+        import json
+        return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_user_config(data: dict) -> None:
+    """Persist user configuration to settings.json (whitelisted keys only).
+    Also clears the settings cache so next get_settings() picks up changes.
+    """
+    import json
+    filtered = {k: v for k, v in data.items() if k in _USER_CONFIG_KEYS and v}
+    SETTINGS_FILE.write_text(json.dumps(filtered, indent=2, ensure_ascii=False), encoding="utf-8")
+    get_settings.cache_clear()
+
+
 @lru_cache
 def get_settings() -> Settings:
-    """Return a cached singleton of the application settings."""
-    return Settings()
+    """Return a cached singleton of the application settings.
+
+    Priority: env vars > settings.json > defaults.
+    """
+    user = load_user_config()
+    return Settings(**user)

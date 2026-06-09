@@ -184,23 +184,34 @@ def list_pages() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def scan_sources() -> list[Source]:
-    """Scan raw/ directory and return source info with hash."""
+def scan_sources(
+    folder: str = "",
+    exclude_patterns: list[str] | None = None,
+) -> list[Source]:
+    """Scan raw/ directory (or a sub-folder) and return source info with hash.
+
+    Args:
+        folder: Sub-folder within raw/ to scan. Empty = scan entire raw/.
+        exclude_patterns: Glob patterns to exclude (e.g. ['*.tmp', '.gitkeep', 'draft/*']).
+    """
     raw = _raw_root()
-    if not raw.exists():
+    base = raw / folder if folder else raw
+    if not base.exists():
         return []
 
+    exclude_patterns = exclude_patterns or []
     sources = []
-    for f in sorted(raw.rglob("*")):
-        if f.is_file() and not f.name.startswith("."):
-            sources.append(
-                Source(
-                    path=str(f.relative_to(raw)),
-                    hash=file_hash(f),
-                    title=f.stem,
-                    status="pending",
-                )
-            )
+    for f in sorted(base.rglob("*")):
+        if not f.is_file() or f.name.startswith("."):
+            continue
+        if any(f.match(p) for p in exclude_patterns):
+            continue
+        sources.append(Source(
+            path=str(f.relative_to(raw)),
+            hash=file_hash(f),
+            title=f.stem,
+            status="pending",
+        ))
     return sources
 
 
