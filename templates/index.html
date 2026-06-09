@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Wiki 浏览器 – LLM Wiki{% endblock %}
+{% block content %}
+<h1>📚 Wiki 浏览器</h1>
+<div class="card">
+    <div class="card-header">📋 所有页面</div>
+    <div id="page-list" class="loading">加载中...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+fetch('/api/wiki/pages')
+  .then(r=>r.json())
+  .then(d=>{
+    let html='<ul class="page-list">';
+    d.pages.forEach(p=>{
+      let tags=[];
+      if(p.page_type) tags.push(`<span class="tag tag-${p.page_type}">${p.page_type}</span>`);
+      if(p.status) tags.push(`<span class="tag tag-${p.status}">${p.status}</span>`);
+      html+=`<li><a href="/page/${encodeURIComponent(p.title)}">${p.title}</a> ${tags.join(' ')}<br><small style="color:var(--muted)">${p.summary||''}</small></li>`;
+    });
+    html+='</ul>';
+    if(d.pages.length===0) html='<p style="color:var(--muted)">暂无页面。请先 <a href="/ingest">Ingest</a> 一些源文档。</p>';
+    document.getElementById('page-list').innerHTML=html;
+    document.getElementById('page-list').classList.remove('loading');
+  });
+</script>
+{% endblock %}

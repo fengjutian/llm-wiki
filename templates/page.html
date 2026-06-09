@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title if page else 'Not Found' }} – LLM Wiki{% endblock %}
+{% block content %}
+{% if page %}
+<h1>{{ page.title }}</h1>
+<div style="margin-bottom:12px">
+    <span class="tag tag-{{ page.frontmatter.page_type or 'concept' }}">{{ page.frontmatter.page_type or 'concept' }}</span>
+    <span class="tag tag-{{ page.frontmatter.status or 'draft' }}">{{ page.frontmatter.status or 'draft' }}</span>
+    {% if page.frontmatter.confidence %}<span style="color:var(--muted);font-size:12px">置信度: {{ page.frontmatter.confidence }}</span>{% endif %}
+</div>
+<div class="card" id="page-content">
+<pre style="white-space:pre-wrap;font-family:inherit;font-size:14px">{{ page.content }}</pre>
+</div>
+<div id="links-section" class="loading">加载链接...</div>
+{% else %}
+<h1>404</h1>
+<p>页面未找到。</p>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if page %}
+<script>
+// Load graph data for backlinks/wikilinks
+fetch('/api/graph')
+  .then(r=>r.json())
+  .then(d=>{
+    let backlinks=[],wikilinks=[];
+    const title='{{ page.title }}';
+    d.edges.forEach(e=>{if(e.target===title) backlinks.push(e.source);if(e.source===title) wikilinks.push(e.target)});
+    let html='<div class="card"><div class="card-header">🔗 链接</div>';
+    html+=`<p><strong>出链 (${wikilinks.length}):</strong> `+wikilinks.map(l=>`<a href="/page/${encodeURIComponent(l)}">[[${l}]]</a>`).join(', ')+'</p>';
+    html+=`<p><strong>入链 (${backlinks.length}):</strong> `+backlinks.map(l=>`<a href="/page/${encodeURIComponent(l)}">[[${l}]]</a>`).join(', ')+'</p>';
+    html+='</div>';
+    document.getElementById('links-section').innerHTML=html;
+    document.getElementById('links-section').classList.remove('loading');
+  });
+
+// Convert [[wikilinks]] in content to clickable links
+const pre=document.getElementById('page-content').querySelector('pre');
+if(pre){
+  pre.innerHTML=pre.innerHTML.replace(/\[\[(.+?)\]\]/g,
+    (_,name)=>`<a href="/page/${encodeURIComponent(name)}">[[${name}]]</a>`);
+}
+</script>
+{% endif %}
+{% endblock %}

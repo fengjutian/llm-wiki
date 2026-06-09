@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Query – LLM Wiki{% endblock %}
+{% block content %}
+<h1>💬 Query</h1>
+<div class="card">
+    <div id="chat-messages" class="chat-messages">
+        <div class="chat-msg assistant"><div class="role">Wiki</div>你好！我可以基于 Wiki 知识库回答你的问题。</div>
+    </div>
+    <div style="display:flex;gap:8px">
+        <input type="text" id="question-input" placeholder="输入你的问题..." style="flex:1" onkeypress="if(event.key==='Enter')doQuery()">
+        <button class="btn btn-primary" onclick="doQuery()">发送</button>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <input type="checkbox" id="write-back"> 将回答保存到 Wiki
+    </label>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function doQuery(){
+  const input=document.getElementById('question-input');
+  const q=input.value.trim();
+  if(!q)return;
+  const msgs=document.getElementById('chat-messages');
+  msgs.innerHTML+=`<div class="chat-msg user"><div class="role">你</div>${q}</div>`;
+  input.value='';
+  msgs.innerHTML+='<div class="chat-msg assistant"><div class="role">Wiki</div><span class="loading">思考中...</span></div>';
+  msgs.scrollTop=msgs.scrollHeight;
+
+  const resp=await fetch('/api/wiki/query',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:q,write_back:document.getElementById('write-back').checked})
+  });
+  const data=await resp.json();
+  // Replace loading message
+  const last=msgs.lastElementChild;
+  let html=data.answer.replace(/\[\[(.+?)\]\]/g,(_,name)=>`<a href="/page/${encodeURIComponent(name)}">[[${name}]]</a>`);
+  last.innerHTML=`<div class="role">Wiki</div>${html}`;
+  if(data.written_back) last.innerHTML+=`<br><small style="color:var(--muted)">✅ 已保存到 Wiki</small>`;
+  msgs.scrollTop=msgs.scrollHeight;
+}
+</script>
+{% endblock %}

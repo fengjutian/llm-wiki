@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}图谱视图 – LLM Wiki{% endblock %}
+{% block head %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+{% endblock %}
+{% block content %}
+<h1>🕸️ 知识图谱</h1>
+<div class="card" style="padding:8px">
+    <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="search-input" placeholder="搜索页面..." style="width:200px">
+        <select id="type-filter" class="btn btn-sm"><option value="">全部类型</option><option value="entity">实体</option><option value="concept">概念</option><option value="source_summary">源摘要</option><option value="overview">综述</option></select>
+    </div>
+    <div id="graph-container"></div>
+</div>
+<div class="card" style="margin-top:12px">
+    <div class="card-header">📊 图统计</div>
+    <div id="stats" class="loading">加载中...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const colors={entity:'#58a6ff',concept:'#3fb950',source_summary:'#d2991d',overview:'#f78166',comparison:'#bc8cff'};
+
+fetch('/api/graph').then(r=>r.json()).then(data=>renderGraph(data));
+fetch('/api/graph/stats').then(r=>r.json()).then(d=>{
+  document.getElementById('stats').innerHTML=`
+    节点: ${d.nodes} | 边: ${d.edges} | 密度: ${(d.density*100).toFixed(1)}% | 孤立页: ${d.orphans}
+    <br>枢纽页: ${(d.hub_pages||[]).slice(0,5).join(', ')}
+  `;
+  document.getElementById('stats').classList.remove('loading');
+});
+
+function renderGraph(data){
+  const container=document.getElementById('graph-container');
+  const W=container.clientWidth,H=container.clientHeight;
+  const svg=d3.select('#graph-container').append('svg');
+  const g=svg.append('g');
+
+  const simulation=d3.forceSimulation(data.nodes)
+    .force('link',d3.forceLink(data.edges).id(d=>d.id).distance(80))
+    .force('charge',d3.forceManyBody().strength(-200))
+    .force('center',d3.forceCenter(W/2,H/2));
+
+  const link=g.append('g').selectAll('line').data(data.edges).join('line')
+    .attr('stroke',d=>d.relation_type==='contradicts'?'#f85149':'#30363d')
+    .attr('stroke-dasharray',d=>d.relation_type==='contradicts'?'6,3':null)
+    .attr('stroke-width',1.5);
+
+  const node=g.append('g').selectAll('circle').data(data.nodes).join('circle')
+    .attr('r',d=>Math.max(6,Math.min(20,d.in_degree*2+4)))
+    .attr('fill',d=>colors[d.page_type]||'#8b949e')
+    .attr('stroke','#1a1d27').attr('stroke-width',1.5)
+    .call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y})
+      .on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y})
+      .on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null}))
+    .on('click',(e,d)=>{window.location='/page/'+encodeURIComponent(d.title)});
+
+  const labels=g.append('g').selectAll('text').data(data.nodes).join('text')
+    .text(d=>d.title).attr('font-size',9).attr('dx',10).attr('dy',3)
+    .attr('fill','#8b949e').style('pointer-events','none');
+
+  simulation.on('tick',()=>{
+    link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+    node.attr('cx',d=>d.x).attr('cy',d=>d.y);
+    labels.attr('x',d=>d.x).attr('y',d=>d.y);
+  });
+
+  const zoom=d3.zoom().on('zoom',e=>g.attr('transform',e.transform));
+  svg.call(zoom);
+
+  document.getElementById('search-input').oninput=function(){
+    const q=this.value.toLowerCase();
+    node.attr('opacity',d=>d.title.toLowerCase().includes(q)?1:.15);
+    labels.attr('opacity',d=>d.title.toLowerCase().includes(q)?1:0);
+  };
+  document.getElementById('type-filter').onchange=function(){
+    const t=this.value;
+    node.attr('opacity',d=>!t||d.page_type===t?1:.15);
+    labels.attr('opacity',d=>!t||d.page_type===t?1:0);
+  };
+}
+</script>
+{% endblock %}

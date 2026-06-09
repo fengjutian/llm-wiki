@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Ingest – LLM Wiki{% endblock %}
+{% block content %}
+<h1>📥 Ingest 源文档</h1>
+<div class="card">
+    <div class="card-header">上传文件</div>
+    <input type="file" id="file-upload" accept=".md,.txt" multiple style="margin-bottom:8px">
+</div>
+<div class="card">
+    <div class="card-header">或粘贴内容</div>
+    <textarea id="paste-content" rows="12" placeholder="在此粘贴 Markdown 或纯文本内容..."></textarea>
+    <div style="margin-top:8px">
+        <input type="text" id="source-name" placeholder="源文档名称（如 attention-paper.md）" style="width:300px">
+    </div>
+</div>
+<div class="card">
+    <div class="card-header">选项</div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input type="checkbox" id="dry-run"> Dry-run（仅预览，不实际写入）
+    </label>
+    <button class="btn btn-primary" onclick="doIngest()">🚀 执行 Ingest</button>
+</div>
+<div id="result" style="display:none" class="card"><div class="card-header">结果</div><div id="result-content"></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function doIngest(){
+  const dryRun=document.getElementById('dry-run').checked;
+  const srcName=document.getElementById('source-name').value.trim();
+  const paste=document.getElementById('paste-content').value.trim();
+  const file=document.getElementById('file-upload').files[0];
+
+  if(!paste&&!file&&!srcName){alert('请上传文件、粘贴内容或输入源文档名称');return}
+
+  let sourcePath=srcName;
+  // If pasting, we need to save to raw/ first – for MVP, use API with inline content
+  if(paste&&!srcName){
+    alert('粘贴内容时请输入"源文档名称"');
+    return;
+  }
+  if(file){
+    sourcePath=file.name;
+    // Upload file via API
+    const formData=new FormData();
+    formData.append('file',file);
+    await fetch('/api/raw/upload',{method:'POST',body:formData});
+  }
+
+  const resultDiv=document.getElementById('result');
+  resultDiv.style.display='block';
+  document.getElementById('result-content').innerHTML='<div class="loading">正在处理...</div>';
+
+  const resp=await fetch('/api/wiki/ingest',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({source_path:sourcePath,dry_run:dryRun})
+  });
+  const data=await resp.json();
+  let html=`<p><strong>状态:</strong> ${data.status}</p>`;
+  if(data.new_pages.length) html+=`<p><strong>新增页面 (${data.new_pages.length}):</strong> ${data.new_pages.join(', ')}</p>`;
+  if(data.updated_pages.length) html+=`<p><strong>更新页面 (${data.updated_pages.length}):</strong> ${data.updated_pages.join(', ')}</p>`;
+  if(data.contradictions.length) html+=`<p><strong>⚠️ 矛盾 (${data.contradictions.length}):</strong></p><ul>${data.contradictions.map(c=>`<li>${c.wiki_page}: ${c.claim_in_source}</li>`).join('')}</ul>`;
+  if(data.errors.length) html+=`<p class="error">${data.errors.join('<br>')}</p>`;
+  if(data.dry_run) html+='<p style="color:var(--yellow)">⚠️ 这是 Dry-run 预览，未实际写入。</p>';
+  document.getElementById('result-content').innerHTML=html;
+}
+</script>
+{% endblock %}

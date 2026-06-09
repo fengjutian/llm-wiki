@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LLM Wiki{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><a href="/">📚 LLM Wiki</a></h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item">🏠 Wiki 浏览器</a>
+                <a href="/graph" class="nav-item">🕸️ 图谱视图</a>
+                <a href="/ingest" class="nav-item">📥 Ingest</a>
+                <a href="/query" class="nav-item">💬 Query</a>
+                <a href="/lint" class="nav-item">🔍 Lint</a>
+                <a href="/branches" class="nav-item">🌿 分支</a>
+                <a href="/docs" class="nav-item" target="_blank">📖 API 文档</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div id="health-badge">⚪ 加载中...</div>
+            </div>
+        </aside>
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% block scripts %}{% endblock %}
+    <script>
+        // Load health status
+        fetch('/api/wiki/lint', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+          .then(r=>r.json())
+          .then(d=>{document.getElementById('health-badge').textContent = '🟢 健康: '+d.health_score})
+          .catch(()=>{document.getElementById('health-badge').textContent = '⚪'})
+    </script>
+</body>
+</html>

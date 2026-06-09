@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}分支管理 – LLM Wiki{% endblock %}
+{% block content %}
+<h1>🌿 分支管理</h1>
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <input type="text" id="new-branch-name" placeholder="新分支名称" style="width:200px">
+    <button class="btn btn-primary" onclick="createBranch()">创建分支</button>
+</div>
+<div class="card"><div id="branch-list" class="loading">加载中...</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadBranches(){
+  const resp=await fetch('/api/branches');
+  const d=await resp.json();
+  let html='<table><thead><tr><th>分支</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+  d.branches.forEach(b=>{
+    html+=`<tr><td>${b.name}</td><td>${b.is_active?'<span class="tag tag-active">当前</span>':''}</td>
+      <td>
+        ${!b.is_active?`<button class="btn btn-sm" onclick="checkout('${b.name}')">切换</button>
+        <button class="btn btn-sm" onclick="mergeBranch('${b.name}')">合并到当前</button>`:''}
+      </td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('branch-list').innerHTML=html;
+  document.getElementById('branch-list').classList.remove('loading');
+}
+async function createBranch(){
+  const name=document.getElementById('new-branch-name').value.trim();
+  if(!name)return;
+  await fetch('/api/branches',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  document.getElementById('new-branch-name').value='';
+  loadBranches();
+}
+async function checkout(name){
+  await fetch(`/api/branches/${name}/checkout`,{method:'POST'});
+  loadBranches();
+}
+async function mergeBranch(name){
+  if(!confirm(`确定将 ${name} 合并到当前分支？`))return;
+  await fetch(`/api/branches/${name}/merge`,{method:'POST'});
+  loadBranches();
+}
+loadBranches();
+</script>
+{% endblock %}
