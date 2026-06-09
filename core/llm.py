@@ -95,8 +95,8 @@ Return a JSON object:
 # Model routing
 # ---------------------------------------------------------------------------
 
-COMPLEX_TASKS = {"lint", "synthesis"}  # use big model
-LIGHT_TASKS = {"ingest", "query", "summary", "entity_extraction"}  # use small model
+COMPLEX_TASKS = {"lint", "synthesis", "ingest"}  # use big model
+LIGHT_TASKS = {"query", "summary", "entity_extraction"}  # use small model
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +250,9 @@ class LLMClient:
                 if attempt < self.settings.llm_max_retries:
                     time.sleep(2 ** attempt)
 
-        raise RuntimeError(f"LLM call failed after {self.settings.llm_max_retries} retries") from last_error
+        raise RuntimeError(
+            f"LLM call failed after {self.settings.llm_max_retries} retries: {last_error}"
+        ) from last_error
 
     def chat_completion_stream(
         self,

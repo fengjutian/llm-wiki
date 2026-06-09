@@ -116,19 +116,29 @@ async function ingestFile(filename, rowId) {
     if (!btn) return;
     const origHTML = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> 处理中...';
+    btn.innerHTML = '<span class="spinner"></span> AI 处理中（最长等待 3 分钟）...';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
 
     try {
         const resp = await fetch('/api/raw/ingest/' + encodeURIComponent(filename), {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({dry_run: dryRun})
+            body: JSON.stringify({dry_run: dryRun}),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         const data = await resp.json();
         showResult(filename, data);
         loadFiles(); // refresh list
     } catch(e) {
-        showResult(filename, {errors: [e.message], status: 'error'});
+        clearTimeout(timeoutId);
+        if (e.name === 'AbortError') {
+            showResult(filename, {errors: ['请求超时（3 分钟）。LLM 服务可能暂时不可用，请稍后重试。'], status: 'timeout'});
+        } else {
+            showResult(filename, {errors: [e.message], status: 'error'});
+        }
         btn.disabled = false;
         btn.innerHTML = origHTML;
     }
