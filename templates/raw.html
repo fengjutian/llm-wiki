@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Raw 源文件 – LLM Wiki{% endblock %}
+{% block content %}
+<h1>📁 Raw 源文件</h1>
+<div class="card">
+    <div class="card-header card-header-row">
+        <span>所有上传的源文档</span>
+        <div class="header-actions">
+            <button class="btn btn-primary btn-sm" onclick="batchIngest()" id="btn-batch">🚀 全部 AI 生成 Wiki</button>
+            <label class="dry-run-label">
+                <input type="checkbox" id="dry-run-batch"> Dry-run
+            </label>
+        </div>
+    </div>
+    <div id="file-list" class="loading">加载中...</div>
+</div>
+
+<!-- Ingest Result Modal -->
+<div id="result-modal" class="modal modal-hidden">
+    <div class="modal-overlay" onclick="closeModal()"></div>
+    <div class="modal-content card">
+        <div class="card-header card-header-row">
+            <span id="modal-title">Ingest 结果</span>
+            <button class="btn btn-sm" onclick="closeModal()">✕</button>
+        </div>
+        <div id="modal-body"></div>
+    </div>
+</div>
+{% endblock %}
+{% block head %}
+<style>
+.card-header-row{display:flex;justify-content:space-between;align-items:center}
+.header-actions{display:flex;gap:8px}
+.dry-run-label{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:center;justify-content:center}
+.modal-hidden{display:none}
+.modal-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6)}
+.modal-content{position:relative;max-width:640px;width:90%;max-height:80vh;overflow-y:auto;z-index:1}
+.file-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.file-row:last-child{border-bottom:none}
+.file-info{flex:1;min-width:200px}
+.file-name{font-weight:600;word-break:break-all}
+.file-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.file-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500}
+.status-pending{background:rgba(88,166,255,.12);color:var(--accent)}
+.status-ingested{background:rgba(63,185,80,.12);color:var(--green)}
+.status-modified{background:rgba(210,153,29,.12);color:var(--yellow)}
+.wiki-links{font-size:12px;color:var(--muted);margin-top:4px}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+const statusLabels = { pending: '待处理', ingested: '已生成', modified: '已修改' };
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function safeId(str) {
+    // Create a safe DOM id from any string (handles Unicode)
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + c;
+        hash |= 0;
+    }
+    return 'f' + Math.abs(hash).toString(36);
+}
+
+async function loadFiles() {
+    const container = document.getElementById('file-list');
+    try {
+        const resp = await fetch('/api/raw/files');
+        const data = await resp.json();
+        if (data.files.length === 0) {
+            container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">暂无源文件。请先 <a href="/ingest">上传文件</a>。</p>';
+            container.classList.remove('loading');
+            return;
+        }
+        let html = '';
+        data.files.forEach((f, idx) => {
+            const statusClass = 'status-' + f.status;
+            const rowId = safeId(f.path);
+            html += `<div class="file-row" id="row-${rowId}">
+                <div class="file-info">
+                    <div class="file-name">📄 ${escapeHtml(f.path)}</div>
+                    <div class="file-meta">${formatSize(f.size)} · <code>${escapeHtml(f.hash)}</code></div>
+                    <div class="wiki-links">
+                        <span class="status-badge ${statusClass}">${statusLabels[f.status] || f.status}</span>
+                        ${f.wiki_pages.length ? ' → ' + f.wiki_pages.map(p => `<a href="/page/${encodeURIComponent(p)}">[[${escapeHtml(p)}]]</a>`).join(', ') : ''}
+                    </div>
+                </div>
+                <div class="file-actions">
+                    <button class="btn btn-sm btn-primary" onclick="ingestFile('${escapeJs(f.path)}', '${rowId}')" id="btn-${rowId}">
+                        🤖 ${f.status === 'ingested' ? '重新生成' : 'AI 生成 Wiki'}
+                    </button>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+        container.classList.remove('loading');
+    } catch(e) {
+        container.innerHTML = `<p class="error">加载失败: ${e.message}</p>`;
+        container.classList.remove('loading');
+    }
+}
+
+async function ingestFile(filename, rowId) {
+    const dryRun = document.getElementById('dry-run-batch').checked;
+    const btn = document.getElementById('btn-' + rowId);
+    if (!btn) return;
+    const origHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 处理中...';
+
+    try {
+        const resp = await fetch('/api/raw/ingest/' + encodeURIComponent(filename), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({dry_run: dryRun})
+        });
+        const data = await resp.json();
+        showResult(filename, data);
+        loadFiles(); // refresh list
+    } catch(e) {
+        showResult(filename, {errors: [e.message], status: 'error'});
+        btn.disabled = false;
+        btn.innerHTML = origHTML;
+    }
+}
+
+async function batchIngest() {
+    const dryRun = document.getElementById('dry-run-batch').checked;
+    const btn = document.getElementById('btn-batch');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 批量处理中...';
+
+    try {
+        const resp = await fetch('/api/wiki/ingest/batch', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({dry_run: dryRun})
+        });
+        const data = await resp.json();
+        let html = `<p><strong>已处理 ${data.processed} 个文件</strong></p><ul>`;
+        data.results.forEach(r => {
+            const icon = r.status === 'skipped' ? '⏭️' : r.errors.length ? '❌' : '✅';
+            html += `<li>${icon} <strong>${escapeHtml(r.source)}</strong> — ${r.status} | 新增 ${r.new_pages} 页，更新 ${r.updated_pages} 页`;
+            if (r.errors.length) html += `<br><span class="error">${r.errors.join(', ')}</span>`;
+            html += '</li>';
+        });
+        html += '</ul>';
+        if (dryRun) html += '<p style="color:var(--yellow)">⚠️ Dry-run 模式，未实际写入。</p>';
+        showResult('批量 Ingest', {html: html});
+        loadFiles();
+    } catch(e) {
+        showResult('批量 Ingest', {errors: [e.message], status: 'error'});
+    }
+}
+
+function showResult(title, data) {
+    document.getElementById('modal-title').textContent = title;
+    let html = '';
+    if (data.html) {
+        html = data.html;
+    } else {
+        html += `<p><strong>状态:</strong> ${data.status || 'unknown'}</p>`;
+        if (data.new_pages && data.new_pages.length) html += `<p><strong>新增页面 (${data.new_pages.length}):</strong> ${data.new_pages.map(p => `<a href="/page/${encodeURIComponent(p)}">${escapeHtml(p)}</a>`).join(', ')}</p>`;
+        if (data.updated_pages && data.updated_pages.length) html += `<p><strong>更新页面 (${data.updated_pages.length}):</strong> ${data.updated_pages.map(p => `<a href="/page/${encodeURIComponent(p)}">${escapeHtml(p)}</a>`).join(', ')}</p>`;
+        if (data.contradictions && data.contradictions.length) html += `<p><strong>⚠️ 矛盾 (${data.contradictions.length}):</strong></p><ul>${data.contradictions.map(c => `<li>${escapeHtml(c.wiki_page || '')}: ${escapeHtml(c.claim_in_source || '')}</li>`).join('')}</ul>`;
+        if (data.errors && data.errors.length) html += `<p class="error">${data.errors.map(escapeHtml).join('<br>')}</p>`;
+        if (data.dry_run) html += '<p style="color:var(--yellow)">⚠️ 这是 Dry-run 预览，未实际写入。</p>';
+    }
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('result-modal').classList.remove('modal-hidden');
+}
+
+function closeModal() {
+    document.getElementById('result-modal').classList.add('modal-hidden');
+}
+
+function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+}
+
+function escapeJs(s) {
+    return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
+}
+
+loadFiles();
+</script>
+{% endblock %}

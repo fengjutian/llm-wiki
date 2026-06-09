@@ -145,6 +145,78 @@ async def api_upload_raw(file: UploadFile = File(...)):
     return {"filename": file.filename, "size": len(content), "status": "uploaded"}
 
 
+@app.get("/api/raw/files")
+async def api_list_raw_files():
+    """List all raw source files with their ingest status."""
+    from core.wiki_io import scan_sources
+    sources = scan_sources()
+    ingested_hashes = _get_ingested_hashes()
+
+    files = []
+    for src in sources:
+        status = "pending"
+        prev_hash = ingested_hashes.get(src.path)
+        if prev_hash:
+            status = "ingested" if prev_hash == src.hash else "modified"
+
+        # Try to find associated wiki page (source_summary type)
+        wiki_pages = []
+        from core.wiki_io import list_pages, read_page
+        for title in list_pages():
+            page = read_page(title)
+            if page and page.frontmatter.get("page_type") == "source_summary":
+                page_sources = page.frontmatter.get("sources", [])
+                for s in page_sources:
+                    if isinstance(s, dict) and s.get("file") == src.path:
+                        wiki_pages.append(title)
+                        break
+
+        files.append({
+            "path": src.path,
+            "hash": src.hash[:12],
+            "size": (_raw_root() / src.path).stat().st_size if (_raw_root() / src.path).exists() else 0,
+            "status": status,
+            "wiki_pages": wiki_pages,
+        })
+
+    return {"files": files, "count": len(files)}
+
+
+@app.post("/api/raw/ingest/{filename:path}")
+async def api_ingest_single_file(filename: str, request: Request):
+    """Ingest a single raw file by its path. Supports dry_run via JSON body."""
+    body = await request.json() if await request.body() else {}
+    dry_run = body.get("dry_run", False)
+    result = ingest_source(filename, dry_run=dry_run)
+    return {
+        "source_path": result.source_path,
+        "status": result.status,
+        "new_pages": result.new_pages,
+        "updated_pages": result.updated_pages,
+        "contradictions": result.contradictions,
+        "dry_run": result.dry_run,
+        "errors": result.errors,
+    }
+
+
+def _get_ingested_hashes() -> dict[str, str]:
+    """Read existing source hashes from wiki source_summary pages."""
+    from core.wiki_io import list_pages, read_page
+    hashes: dict[str, str] = {}
+    for title in list_pages():
+        page = read_page(title)
+        if page and page.frontmatter.get("page_type") == "source_summary":
+            sources = page.frontmatter.get("sources", [])
+            for s in sources:
+                if isinstance(s, dict) and "file" in s and "hash" in s:
+                    hashes[s["file"]] = s["hash"]
+    return hashes
+
+
+def _raw_root() -> Path:
+    return get_settings().raw_root
+
+
 @app.post("/api/wiki/query")
 async def api_query(request: Request):
     body = await request.json()
@@ -340,6 +412,11 @@ async def page_graph(request: Request):
 @app.get("/ingest", response_class=HTMLResponse)
 async def page_ingest(request: Request):
     return _render("ingest.html")
+
+
+@app.get("/raw", response_class=HTMLResponse)
+async def page_raw(request: Request):
+    return _render("raw.html")
 
 
 @app.get("/query", response_class=HTMLResponse)
