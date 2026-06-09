@@ -62,13 +62,8 @@
 {% endblock %}
 {% block head %}
 <style>
-.card-header-row{display:flex;justify-content:space-between;align-items:center}
 .header-actions{display:flex;gap:8px}
 .dry-run-label{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer}
-.modal{position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;align-items:center;justify-content:center}
-.modal-hidden{display:none}
-.modal-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6)}
-.modal-content{position:relative;max-width:640px;width:90%;max-height:80vh;overflow-y:auto;z-index:1}
 .file-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
 .file-row:last-child{border-bottom:none}
 .file-info{flex:1;min-width:200px}
@@ -94,6 +89,8 @@
 {% block scripts %}
 <script>
 const statusLabels = { pending: '待处理', ingested: '已生成', modified: '已修改' };
+const pageTypeIcons = { entity: '🏷️', concept: '💡', source_summary: '📋', overview: '🗺️', comparison: '⚖️' };
+const pageTypeLabels = { entity: '实体', concept: '概念', source_summary: '源摘要', overview: '综述', comparison: '对比' };
 
 function formatSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
@@ -120,32 +117,65 @@ async function loadFiles() {
     try {
         const resp = await fetch('/api/raw/files');
         const data = await resp.json();
-        if (data.files.length === 0) {
-            container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">暂无源文件，点击 <b>📤 上传文件</b> 开始。</p>';
+        const rawFiles = data.raw_files || data.files || []; // backward compat
+        const wikiFiles = data.wiki_files || [];
+
+        if (rawFiles.length === 0 && wikiFiles.length === 0) {
+            container.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center">暂无文件，点击 <b>📤 上传文件</b> 开始。</p>';
             container.classList.remove('loading');
             return;
         }
+
         let html = '';
-        data.files.forEach((f) => {
-            const statusClass = 'status-' + f.status;
-            const rowId = safeId(f.path);
-            html += '<div class="file-row" id="row-' + rowId + '">' +
-                '<div class="file-info">' +
-                    '<div class="file-name">📄 ' + escapeHtml(f.path) + '</div>' +
-                    '<div class="file-meta">' + formatSize(f.size) + ' · <code>' + escapeHtml(f.hash) + '</code></div>' +
-                    '<div class="wiki-links">' +
-                        '<span class="status-badge ' + statusClass + '">' + (statusLabels[f.status] || f.status) + '</span>' +
-                        (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<a href="/page/' + encodeURIComponent(p) + '">[[' + escapeHtml(p) + ']]</a>'}).join(', ') : '') +
+
+        // ---- Raw source files ----
+        if (rawFiles.length > 0) {
+            html += '<h2 style="margin:16px 0 8px">📁 Raw 源文件 <span style="font-size:14px;color:var(--muted);font-weight:normal">(' + rawFiles.length + ')</span></h2>';
+            rawFiles.forEach((f) => {
+                const statusClass = 'status-' + f.status;
+                const rowId = safeId(f.path);
+                html += '<div class="file-row" id="row-' + rowId + '">' +
+                    '<div class="file-info">' +
+                        '<div class="file-name">📄 ' + escapeHtml(f.path) + '</div>' +
+                        '<div class="file-meta">' + formatSize(f.size) + ' · <code>' + escapeHtml(f.hash) + '</code></div>' +
+                        '<div class="wiki-links">' +
+                            '<span class="status-badge ' + statusClass + '">' + (statusLabels[f.status] || f.status) + '</span>' +
+                            (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<a href="/page/' + encodeURIComponent(p) + '">[[' + escapeHtml(p) + ']]</a>'}).join(', ') : '') +
+                        '</div>' +
                     '</div>' +
-                '</div>' +
-                '<div class="file-actions">' +
-                    '<button class="btn btn-sm" onclick="previewFile(\'' + escapeJs(f.path) + '\')" title="预览文件内容">👁 预览</button>' +
-                    '<button class="btn btn-sm btn-primary" onclick="ingestFile(\'' + escapeJs(f.path) + '\', \'' + rowId + '\')" id="btn-' + rowId + '">' +
-                        '🤖 ' + (f.status === 'ingested' ? '重新生成' : 'AI 生成 Wiki') +
-                    '</button>' +
-                '</div>' +
-            '</div>';
-        });
+                    '<div class="file-actions">' +
+                        '<button class="btn btn-sm" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="预览文件内容">👁 预览</button>' +
+                        '<button class="btn btn-sm btn-primary" onclick="ingestFile(\'' + escapeJs(f.path) + '\', \'' + rowId + '\')" id="btn-' + rowId + '">' +
+                            '🤖 ' + (f.status === 'ingested' ? '重新生成' : 'AI 生成 Wiki') +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
+            });
+        }
+
+        // ---- Generated wiki pages ----
+        if (wikiFiles.length > 0) {
+            html += '<h2 style="margin:24px 0 8px">📝 生成的 Wiki 页面 <span style="font-size:14px;color:var(--muted);font-weight:normal">(' + wikiFiles.length + ')</span></h2>';
+            wikiFiles.forEach((f) => {
+                const icon = pageTypeIcons[f.page_type] || '📄';
+                const typeLabel = pageTypeLabels[f.page_type] || f.page_type;
+                const rowId = safeId('wiki-' + f.title);
+                html += '<div class="file-row" id="row-' + rowId + '">' +
+                    '<div class="file-info">' +
+                        '<div class="file-name">' + icon + ' <a href="/page/' + encodeURIComponent(f.title) + '">' + escapeHtml(f.title) + '</a></div>' +
+                        '<div class="file-meta">' + formatSize(f.size) + ' · ' + escapeHtml(f.filename) + '</div>' +
+                        '<div class="wiki-links">' +
+                            '<span class="status-badge status-' + f.status + '">' + typeLabel + ' · ' + (f.status || 'draft') + '</span>' +
+                            (f.summary ? ' <span style="font-size:12px;color:var(--muted)">' + escapeHtml(f.summary) + '</span>' : '') +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="file-actions">' +
+                        '<button class="btn btn-sm" onclick="previewWikiFile(\'' + escapeJs(f.title) + '\')" title="预览 Markdown 源码">👁 预览</button>' +
+                    '</div>' +
+                '</div>';
+            });
+        }
+
         container.innerHTML = html;
         container.classList.remove('loading');
     } catch(e) {
@@ -155,15 +185,11 @@ async function loadFiles() {
 }
 
 // ===================================================================
-// Preview
+// Preview – Raw files
 // ===================================================================
 
-async function previewFile(filename) {
-    document.getElementById('preview-title').textContent = '📄 ' + filename;
-    document.getElementById('preview-meta').textContent = '';
-    document.getElementById('preview-content').textContent = '加载中...';
-    document.getElementById('preview-modal').classList.remove('modal-hidden');
-
+async function previewRawFile(filename) {
+    showPreviewModal('📄 ' + filename);
     try {
         const resp = await fetch('/api/raw/preview/' + encodeURIComponent(filename));
         if (!resp.ok) { throw new Error('文件不存在 (' + resp.status + ')'); }
@@ -173,6 +199,30 @@ async function previewFile(filename) {
     } catch(e) {
         document.getElementById('preview-content').textContent = '加载失败: ' + e.message;
     }
+}
+
+// ===================================================================
+// Preview – Wiki pages (raw markdown)
+// ===================================================================
+
+async function previewWikiFile(title) {
+    showPreviewModal('📝 ' + title);
+    try {
+        const resp = await fetch('/api/wiki/preview/' + encodeURIComponent(title));
+        if (!resp.ok) { throw new Error('页面不存在 (' + resp.status + ')'); }
+        const data = await resp.json();
+        document.getElementById('preview-meta').textContent = '大小: ' + formatSize(data.size) + ' · ' + data.content.split('\n').length + ' 行 · ' + escapeHtml(data.filename);
+        document.getElementById('preview-content').textContent = data.content;
+    } catch(e) {
+        document.getElementById('preview-content').textContent = '加载失败: ' + e.message;
+    }
+}
+
+function showPreviewModal(title) {
+    document.getElementById('preview-title').textContent = title;
+    document.getElementById('preview-meta').textContent = '';
+    document.getElementById('preview-content').textContent = '加载中...';
+    document.getElementById('preview-modal').classList.remove('modal-hidden');
 }
 
 function closePreviewModal() {

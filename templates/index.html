@@ -6,9 +6,59 @@
     <div class="card-header">📋 所有页面</div>
     <div id="page-list" class="loading">加载中...</div>
 </div>
+
+<!-- Preview Modal -->
+<div id="preview-modal" class="modal modal-hidden">
+    <div class="modal-overlay" onclick="closePreviewModal()"></div>
+    <div class="modal-content card" style="max-width:900px">
+        <div class="card-header card-header-row">
+            <span id="preview-title">📄 页面预览</span>
+            <button class="btn btn-sm" onclick="closePreviewModal()">✕</button>
+        </div>
+        <div style="margin-bottom:8px;font-size:12px;color:var(--muted)" id="preview-meta"></div>
+        <div id="preview-content" style="max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.3);border-radius:6px;padding:16px;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:13px">加载中...</div>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
+// ===================================================================
+// Escape helpers
+// ===================================================================
+function escapeHtml(s) { const d=document.createElement('div');d.textContent=s;return d.innerHTML; }
+function escapeJs(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
+
+// ===================================================================
+// Preview modal
+// ===================================================================
+function showPreviewModal(title) {
+    document.getElementById('preview-title').textContent = '📄 ' + title;
+    document.getElementById('preview-meta').textContent = '';
+    document.getElementById('preview-content').textContent = '加载中...';
+    document.getElementById('preview-modal').classList.remove('modal-hidden');
+}
+function closePreviewModal() {
+    document.getElementById('preview-modal').classList.add('modal-hidden');
+}
+
+async function previewWikiPage(title) {
+    showPreviewModal(title);
+    try {
+        const resp = await fetch('/api/wiki/preview/' + encodeURIComponent(title));
+        if (!resp.ok) { throw new Error('页面不存在 (' + resp.status + ')'); }
+        const data = await resp.json();
+        const lines = data.content.split('\n').length;
+        document.getElementById('preview-meta').textContent =
+            '文件名: ' + escapeHtml(data.filename) + ' · 大小: ' + (data.size > 1024 ? (data.size/1024).toFixed(1)+' KB' : data.size+' B') + ' · ' + lines + ' 行';
+        document.getElementById('preview-content').textContent = data.content;
+    } catch(e) {
+        document.getElementById('preview-content').textContent = '加载失败: ' + e.message;
+    }
+}
+
+// ===================================================================
+// Load page list
+// ===================================================================
 fetch('/api/wiki/pages')
   .then(r=>r.json())
   .then(d=>{
@@ -17,12 +67,20 @@ fetch('/api/wiki/pages')
       let tags=[];
       if(p.page_type) tags.push(`<span class="tag tag-${p.page_type}">${p.page_type}</span>`);
       if(p.status) tags.push(`<span class="tag tag-${p.status}">${p.status}</span>`);
-      html+=`<li><a href="/page/${encodeURIComponent(p.title)}">${p.title}</a> ${tags.join(' ')}<br><small style="color:var(--muted)">${p.summary||''}</small></li>`;
+      const titleJs = escapeJs(p.title);
+      html+=`<li style="cursor:pointer" onclick="previewWikiPage('${titleJs}')" title="点击预览页面">`;
+      html+=`<span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">${escapeHtml(p.title)}</span> ${tags.join(' ')}`;
+      html+=`<br><small style="color:var(--muted)">${escapeHtml(p.summary||'')}</small></li>`;
     });
     html+='</ul>';
     if(d.pages.length===0) html='<p style="color:var(--muted)">暂无页面。请先 <a href="/ingest">Ingest</a> 一些源文档。</p>';
     document.getElementById('page-list').innerHTML=html;
     document.getElementById('page-list').classList.remove('loading');
   });
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closePreviewModal();
+});
 </script>
 {% endblock %}

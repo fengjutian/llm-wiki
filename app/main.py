@@ -147,12 +147,13 @@ async def api_upload_raw(file: UploadFile = File(...)):
 
 @app.get("/api/raw/files")
 async def api_list_raw_files():
-    """List all raw source files with their ingest status."""
-    from core.wiki_io import scan_sources
+    """List all raw source files and generated wiki pages with their status."""
+    from core.wiki_io import scan_sources, list_pages, read_page
     sources = scan_sources()
     ingested_hashes = _get_ingested_hashes()
 
-    files = []
+    # Raw source files
+    raw_files = []
     for src in sources:
         status = "pending"
         prev_hash = ingested_hashes.get(src.path)
@@ -161,7 +162,6 @@ async def api_list_raw_files():
 
         # Try to find associated wiki page (source_summary type)
         wiki_pages = []
-        from core.wiki_io import list_pages, read_page
         for title in list_pages():
             page = read_page(title)
             if page and page.frontmatter.get("page_type") == "source_summary":
@@ -171,7 +171,7 @@ async def api_list_raw_files():
                         wiki_pages.append(title)
                         break
 
-        files.append({
+        raw_files.append({
             "path": src.path,
             "hash": src.hash[:12],
             "size": (_raw_root() / src.path).stat().st_size if (_raw_root() / src.path).exists() else 0,
@@ -179,7 +179,22 @@ async def api_list_raw_files():
             "wiki_pages": wiki_pages,
         })
 
-    return {"files": files, "count": len(files)}
+    # Generated wiki pages
+    wiki_files = []
+    for title in list_pages():
+        page = read_page(title)
+        if page:
+            wiki_files.append({
+                "title": page.title,
+                "filename": page.filename,
+                "page_type": page.frontmatter.get("page_type", "concept"),
+                "status": page.frontmatter.get("status", "draft"),
+                "summary": page.frontmatter.get("summary", ""),
+                "size": len(page.full_markdown),
+            })
+
+    return {"raw_files": raw_files, "raw_count": len(raw_files),
+            "wiki_files": wiki_files, "wiki_count": len(wiki_files)}
 
 
 @app.post("/api/raw/ingest/{filename:path}")
@@ -217,6 +232,19 @@ async def api_read_raw_file(filename: str):
     except Exception as exc:
         return JSONResponse({"error": "read failed: " + str(exc), "filename": filename}, status_code=500)
     return {"filename": filename, "content": content, "size": len(content)}
+
+
+@app.get("/api/wiki/preview/{name:path}")
+async def api_read_wiki_file(name: str):
+    """Read the raw markdown content of a wiki page for preview."""
+    if not name:
+        return JSONResponse({"error": "missing page name"}, status_code=400)
+    from core.wiki_io import read_page
+    page = read_page(name)
+    if not page:
+        return JSONResponse({"error": "page not found", "name": name}, status_code=404)
+    content = page.full_markdown
+    return {"filename": page.filename, "title": page.title, "content": content, "size": len(content)}
 
 
 def _get_ingested_hashes() -> dict[str, str]:
@@ -415,13 +443,15 @@ async def page_home():
 async def page_view(name: str):
     from core.wiki_io import read_page as io_read_page
     page = io_read_page(name)
+    if not page:
+        return HTMLResponse(f"<h1>404</h1><p>Page '{name}' not found.</p>", status_code=404)
     try:
-        return templates.TemplateResponse("page.html", {"page": page})
+        tmpl = templates.get_template("page.html")
+        html = tmpl.render(page=page)
+        return HTMLResponse(html)
     except Exception as e:
         logger.warning("Template 'page.html' failed: %s", e)
-        if page:
-            return HTMLResponse(f"<h1>{page.title}</h1><pre>{page.content[:5000]}</pre>")
-        return HTMLResponse(f"<h1>404</h1><p>Page '{name}' not found.</p>", status_code=404)
+        return HTMLResponse(f"<h1>{page.title}</h1><pre>{page.content[:5000]}</pre>")
 
 
 @app.get("/graph", response_class=HTMLResponse)
