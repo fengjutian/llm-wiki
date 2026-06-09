@@ -199,25 +199,24 @@ async def api_ingest_single_file(filename: str, request: Request):
     }
 
 
-@app.get("/api/raw/file-content")
-async def api_read_raw_file(request: Request):
-    """Read the content of a raw source file for preview. Use ?path=... query parameter."""
-    path = request.query_params.get("path", "")
-    if not path:
-        return JSONResponse({"error": "missing ?path= parameter"}, status_code=400)
+@app.get("/api/raw/preview/{filename:path}")
+async def api_read_raw_file(filename: str):
+    """Read the content of a raw source file for preview."""
+    if not filename:
+        return JSONResponse({"error": "missing filename"}, status_code=400)
     settings = get_settings()
-    fp = settings.raw_root / path
-    logger.info("Preview request: path=%s, raw_root=%s, full=%s, exists=%s", path, settings.raw_root, fp, fp.exists())
+    fp = settings.raw_root / filename
+    logger.info("Preview: filename=%s, full=%s, exists=%s", filename, fp, fp.exists())
     if not fp.exists():
         return JSONResponse(
-            {"error": "file not found", "path": path, "looked_in": str(fp)},
+            {"error": "file not found", "filename": filename, "looked_in": str(fp)},
             status_code=404,
         )
     try:
         content = fp.read_text(encoding="utf-8")
     except Exception as exc:
-        return JSONResponse({"error": "read failed: " + str(exc), "path": path}, status_code=500)
-    return {"path": path, "content": content, "size": len(content)}
+        return JSONResponse({"error": "read failed: " + str(exc), "filename": filename}, status_code=500)
+    return {"filename": filename, "content": content, "size": len(content)}
 
 
 def _get_ingested_hashes() -> dict[str, str]:

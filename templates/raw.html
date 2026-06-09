@@ -165,7 +165,7 @@ async function previewFile(filename) {
     document.getElementById('preview-modal').classList.remove('modal-hidden');
 
     try {
-        const resp = await fetch('/api/raw/file-content?path=' + encodeURIComponent(filename));
+        const resp = await fetch('/api/raw/preview/' + encodeURIComponent(filename));
         if (!resp.ok) { throw new Error('文件不存在 (' + resp.status + ')'); }
         const data = await resp.json();
         document.getElementById('preview-meta').textContent = '大小: ' + formatSize(data.size) + ' · ' + data.content.split('\n').length + ' 行';
