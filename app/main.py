@@ -239,7 +239,59 @@ async def api_read_raw_file(filename: str):
         content = fp.read_text(encoding="utf-8")
     except Exception as exc:
         return JSONResponse({"error": "read failed: " + str(exc), "filename": filename}, status_code=500)
-    return {"filename": filename, "content": content, "size": len(content)}
+        return {"filename": filename, "content": content, "size": len(content)}
+
+
+@app.delete("/api/raw/files/{filename:path}")
+async def api_delete_raw_file(filename: str):
+    """Delete a raw source file."""
+    if not filename:
+        return JSONResponse({"error": "missing filename"}, status_code=400)
+    settings = get_settings()
+    fp = settings.raw_root / filename
+    if not fp.exists():
+        return JSONResponse(
+            {"error": "file not found", "filename": filename},
+            status_code=404,
+        )
+    try:
+        size = fp.stat().st_size
+        fp.unlink()
+        logger.info("Deleted raw file: %s (%d bytes)", filename, size)
+        return {"filename": filename, "status": "deleted", "size": size}
+    except Exception as exc:
+        logger.error("Delete raw file failed: %s", exc)
+        return JSONResponse(
+            {"error": "delete failed: " + str(exc), "filename": filename},
+            status_code=500,
+        )
+
+
+@app.put("/api/raw/files/{filename:path}")
+async def api_update_raw_file(filename: str, request: Request):
+    """Update (edit) the content of a raw source file."""
+    if not filename:
+        return JSONResponse({"error": "missing filename"}, status_code=400)
+    settings = get_settings()
+    fp = settings.raw_root / filename
+    if not fp.exists():
+        return JSONResponse(
+            {"error": "file not found", "filename": filename},
+            status_code=404,
+        )
+    try:
+        body = await request.json()
+        new_content = body.get("content", "")
+        fp.write_text(new_content, encoding="utf-8")
+        new_size = fp.stat().st_size
+        logger.info("Updated raw file: %s (%d bytes)", filename, new_size)
+        return {"filename": filename, "status": "updated", "size": new_size}
+    except Exception as exc:
+        logger.error("Update raw file failed: %s", exc)
+        return JSONResponse(
+            {"error": "update failed: " + str(exc), "filename": filename},
+            status_code=500,
+        )
 
 
 @app.get("/api/wiki/preview/{name:path}")
