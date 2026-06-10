@@ -152,11 +152,11 @@ async function loadFiles() {
             const rowId = safeId(f.path);
             html += '<div class="file-row" id="row-' + rowId + '">' +
                 '<div class="file-info">' +
-                    '<div class="file-name" style="cursor:pointer" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="点击预览文件">📄 <span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">' + escapeHtml(f.path) + '</span></div>' +
+                    '<div class="file-name" style="cursor:pointer" onclick="previewRawFile(\'' + escapeJs(f.path) + '\')" title="点击预览文件">📄 <span style="color:var(--accent);font-weight:500;text-underline-offset:4px;text-decoration-color:var(--border)">' + escapeHtml(f.path) + '</span></div>' +
                     '<div class="file-meta">' + formatSize(f.size) + ' · <code>' + escapeHtml(f.hash) + '</code></div>' +
                     '<div class="wiki-links">' +
                         '<span class="status-badge ' + statusClass + '">' + (statusLabels[f.status] || f.status) + '</span>' +
-                        (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<span style="color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="event.stopPropagation();previewWikiFile(\'' + escapeJs(p) + '\')" title="点击预览 [[ ' + escapeHtml(p) + ' ]]">[[' + escapeHtml(p) + ']]</span>'}).join(', ') : '') +
+                        (f.wiki_pages.length ? ' → ' + f.wiki_pages.map(function(p){return '<span style="color:var(--accent);cursor:pointer;text-underline-offset:3px" onclick="event.stopPropagation();previewWikiFile(\'' + escapeJs(p) + '\')" title="点击预览 [[ ' + escapeHtml(p) + ' ]]">[[' + escapeHtml(p) + ']]</span>'}).join(', ') : '') +
                     '</div>' +
                 '</div>' +
                 '<div class="file-actions">' +

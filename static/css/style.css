@@ -31,7 +31,7 @@ body{
 *{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
 
 a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
+a:hover{color:var(--accent);opacity:.85}
 
 .app{display:flex;min-height:100vh}
 .sidebar{width:clamp(180px,15vw,240px);min-width:180px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;transition:background var(--transition-speed),border-color var(--transition-speed)}

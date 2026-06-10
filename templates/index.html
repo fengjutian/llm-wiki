@@ -121,7 +121,7 @@ fetch('/api/wiki/pages')
       if(p.status) tags.push(`<span class="tag tag-${p.status}">${p.status}</span>`);
       const titleJs = escapeJs(p.title);
       html+=`<li style="cursor:pointer" onclick="previewWikiPage('${titleJs}')" title="点击预览页面">`;
-      html+=`<span style="color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--border)">${escapeHtml(p.title)}</span> ${tags.join(' ')}`;
+      html+=`<span style="color:var(--accent);font-weight:500;text-underline-offset:4px;text-decoration-color:var(--border)">${escapeHtml(p.title)}</span> ${tags.join(' ')}`;
       html+=`<br><small style="color:var(--muted)">${escapeHtml(p.summary||'')}</small></li>`;
     });
     html+='</ul>';
