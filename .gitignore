@@ -1,4 +1,6 @@
 settings.json
+workbench.json
+projects/
 .vscode/
 .qodo/
 node_modules/

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Workbench – LLM Wiki{% endblock %}
+{% block content %}
+<h1>🛠️ Workbench</h1>
+<p style="color:var(--muted);margin-bottom:16px">管理多个 Wiki 项目，每个项目拥有独立的 wiki/ 和 raw/ 目录。</p>
+
+<!-- 当前激活项目 -->
+<div id="active-banner" class="card" style="border-left:4px solid var(--accent);margin-bottom:16px;display:none">
+    <span style="font-weight:600">📌 当前项目：</span><span id="active-name" style="color:var(--accent)"></span>
+</div>
+
+<!-- 新建项目 -->
+<div class="card" style="margin-bottom:16px">
+    <div class="card-header">➕ 新建项目</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" id="new-project-name" placeholder="项目名称" style="flex:1;min-width:150px">
+        <input type="text" id="new-project-desc" placeholder="描述（可选）" style="flex:2;min-width:200px">
+        <button class="btn btn-primary" onclick="createProject()">创建</button>
+    </div>
+    <div id="create-error" class="error" style="display:none;margin-top:8px"></div>
+</div>
+
+<!-- 项目列表 -->
+<div class="card">
+    <div class="card-header">📁 所有项目</div>
+    <div id="project-list" class="loading">加载中...</div>
+</div>
+
+<!-- 删除确认弹窗 -->
+<div id="delete-modal" class="modal modal-hidden">
+    <div class="modal-overlay" onclick="closeDeleteModal()"></div>
+    <div class="modal-content card" style="max-width:440px">
+        <div class="card-header card-header-row">
+            <span>⚠️ 确认删除</span>
+            <button class="btn btn-sm" onclick="closeDeleteModal()">✕</button>
+        </div>
+        <p id="delete-msg"></p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button class="btn" onclick="closeDeleteModal()">取消</button>
+            <button class="btn btn-danger" id="delete-confirm-btn">删除</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function escapeHtml(s) { const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+
+let pendingDelete = null;
+
+// ==================== Load ====================
+function loadProjects() {
+    fetch('/api/workbench/projects')
+        .then(r => r.json())
+        .then(d => {
+            // Active banner
+            if (d.active) {
+                document.getElementById('active-banner').style.display = 'block';
+                document.getElementById('active-name').textContent = d.active;
+            } else {
+                document.getElementById('active-banner').style.display = 'none';
+            }
+
+            // Project list
+            let html = '';
+            if (!d.projects || d.projects.length === 0) {
+                html = '<p style="color:var(--muted);text-align:center;padding:20px">暂无项目，请在上方创建一个。</p>';
+            } else {
+                html = '<table><thead><tr><th>项目名称</th><th>描述</th><th>页数</th><th>创建时间</th><th>操作</th></tr></thead><tbody>';
+                d.projects.forEach(p => {
+                    const isActive = p.name === d.active;
+                    html += '<tr' + (isActive ? ' style="background:rgba(88,166,255,.06)"' : '') + '>';
+                    html += '<td><strong>' + escapeHtml(p.name) + '</strong>' + (isActive ? ' <span class="tag tag-active">当前</span>' : '') + '</td>';
+                    html += '<td style="color:var(--muted)">' + escapeHtml(p.description || '—') + '</td>';
+                    html += '<td>' + p.page_count + '</td>';
+                    html += '<td style="font-size:12px;color:var(--muted)">' + escapeHtml(p.created_at || '') + '</td>';
+                    html += '<td>';
+                    if (!isActive) {
+                        html += '<button class="btn btn-sm btn-primary" style="margin-right:4px" onclick="activateProject(\'' + escapeHtml(p.name) + '\')">切换</button>';
+                    }
+                    html += '<button class="btn btn-sm btn-danger" onclick="confirmDelete(\'' + escapeHtml(p.name) + '\')">删除</button>';
+                    html += '</td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+            document.getElementById('project-list').innerHTML = html;
+            document.getElementById('project-list').classList.remove('loading');
+        })
+        .catch(e => {
+            document.getElementById('project-list').innerHTML = '<p class="error">加载失败: ' + e.message + '</p>';
+            document.getElementById('project-list').classList.remove('loading');
+        });
+}
+
+// ==================== Create ====================
+function createProject() {
+    const name = document.getElementById('new-project-name').value.trim();
+    const desc = document.getElementById('new-project-desc').value.trim();
+    const errEl = document.getElementById('create-error');
+
+    if (!name) {
+        errEl.textContent = '请输入项目名称';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    errEl.style.display = 'none';
+    fetch('/api/workbench/projects', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, description: desc})
+    })
+    .then(r => {
+        if (!r.ok) return r.json().then(e => { throw new Error(e.detail || '创建失败'); });
+        return r.json();
+    })
+    .then(() => {
+        document.getElementById('new-project-name').value = '';
+        document.getElementById('new-project-desc').value = '';
+        loadProjects();
+    })
+    .catch(e => {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+    });
+}
+
+// ==================== Activate ====================
+function activateProject(name) {
+    fetch('/api/workbench/projects/' + encodeURIComponent(name) + '/activate', {
+        method: 'POST'
+    })
+    .then(r => {
+        if (!r.ok) return r.json().then(e => { throw new Error(e.detail || '切换失败'); });
+        return r.json();
+    })
+    .then(() => {
+        loadProjects();
+        // Also refresh the sidebar badge
+        fetch('/api/graph/stats')
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('health-badge').textContent = '📊 ' + d.nodes + '页 ' + d.edges + '链';
+            })
+            .catch(() => {});
+    })
+    .catch(e => alert('切换失败: ' + e.message));
+}
+
+// ==================== Delete ====================
+function confirmDelete(name) {
+    pendingDelete = name;
+    document.getElementById('delete-msg').textContent = '确定要删除项目 "' + name + '" 吗？此操作不可撤销。';
+    document.getElementById('delete-modal').classList.remove('modal-hidden');
+    document.getElementById('delete-confirm-btn').onclick = function() {
+        deleteProject(name);
+    };
+}
+
+function closeDeleteModal() {
+    document.getElementById('delete-modal').classList.add('modal-hidden');
+    pendingDelete = null;
+}
+
+function deleteProject(name) {
+    fetch('/api/workbench/projects/' + encodeURIComponent(name) + '?delete_files=true', {
+        method: 'DELETE'
+    })
+    .then(r => {
+        if (!r.ok) return r.json().then(e => { throw new Error(e.detail || '删除失败'); });
+        return r.json();
+    })
+    .then(() => {
+        closeDeleteModal();
+        loadProjects();
+    })
+    .catch(e => alert('删除失败: ' + e.message));
+}
+
+// ESC to close delete modal
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeDeleteModal();
+});
+
+// Enter to submit new project
+document.getElementById('new-project-name').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') createProject();
+});
+document.getElementById('new-project-desc').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') createProject();
+});
+
+// Initial load
+loadProjects();
+</script>
+{% endblock %}

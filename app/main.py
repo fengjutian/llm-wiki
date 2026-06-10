@@ -647,12 +647,14 @@ from api.graph import router as graph_router
 from api.impact import router as impact_router
 from api.branch import router as branch_router
 from api.webhook import router as webhook_router
+from api.workbench import router as workbench_router
 
 app.include_router(entity_router)
 app.include_router(graph_router)
 app.include_router(impact_router)
 app.include_router(branch_router)
 app.include_router(webhook_router)
+app.include_router(workbench_router)
 
 
 # ============================================================================
@@ -677,6 +679,11 @@ async def page_view(name: str):
     except Exception as e:
         logger.warning("Template 'page.html' failed: %s", e)
         return HTMLResponse(f"<h1>{page.title}</h1><pre>{page.content[:5000]}</pre>")
+
+
+@app.get("/workbench", response_class=HTMLResponse)
+async def page_workbench(request: Request):
+    return _render("workbench.html")
 
 
 @app.get("/graph", response_class=HTMLResponse)
