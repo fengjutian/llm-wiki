@@ -17,6 +17,14 @@ import aiofiles
 from core.config import get_settings, load_user_config, save_user_config
 from core.git import open_wiki_repo
 from core.graph_engine import get_graph, invalidate_graph_cache
+from core.watcher import (
+    start_watching,
+    stop_watching,
+    get_watch_status,
+    list_watched_folders,
+    stop_all_watchers,
+    set_on_file_detected,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -45,7 +53,31 @@ async def lifespan(app: FastAPI):
         logger.info("Graph cache warmed")
     except Exception as exc:
         logger.warning("Graph init skipped: %s", exc)
+
+    # Register auto-ingest callback for folder watcher
+    async def _auto_ingest_callback(rel_path: str) -> None:
+        """Called by the watcher when a new .md/.txt file is detected."""
+        try:
+            from api.wiki import ingest_source
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                ingest_source, rel_path, False,
+            )
+            logger.info(
+                "Auto-ingested %s: status=%s new=%d updated=%d",
+                rel_path, result.status,
+                len(result.new_pages), len(result.updated_pages),
+            )
+        except Exception as exc:
+            logger.error("Auto-ingest failed for %s: %s", rel_path, exc)
+
+    set_on_file_detected(_auto_ingest_callback)
+
     yield
+
+    # Shutdown: stop all folder watchers
+    await stop_all_watchers()
     logger.info("Shutting down")
 
 
@@ -534,6 +566,76 @@ async def api_test_connection():
             "error": str(exc),
             "latency_ms": elapsed,
         }
+
+
+# ============================================================================
+# Watch API – folder monitoring & auto-ingest
+# ============================================================================
+
+@app.post("/api/watch/start")
+async def api_watch_start(request: Request):
+    """Start watching a folder under raw/ for new .md/.txt files.
+
+    Body: { "folder": "papers/", "auto_ingest": true }
+    """
+    body = await request.json() if await request.body() else {}
+    folder = body.get("folder", "")
+    auto_ingest = body.get("auto_ingest", True)
+    session = await start_watching(folder=folder, auto_ingest=auto_ingest)
+    return session.to_dict()
+
+
+@app.post("/api/watch/stop")
+async def api_watch_stop(request: Request):
+    """Stop watching a folder."""
+    body = await request.json() if await request.body() else {}
+    folder = body.get("folder", "")
+    stopped = await stop_watching(folder=folder)
+    return {"folder": folder, "stopped": stopped}
+
+
+@app.get("/api/watch/status")
+async def api_watch_status(folder: str = ""):
+    """Get the status of watch sessions."""
+    status = get_watch_status(folder=folder)
+    if status is None:
+        return JSONResponse({"error": "watch session not found", "folder": folder}, status_code=404)
+    return status
+
+
+@app.get("/api/watch/folders")
+async def api_watch_folders():
+    """List all watched folders."""
+    return {"folders": list_watched_folders()}
+
+
+@app.get("/api/watch/scan")
+async def api_watch_scan(folder: str = ""):
+    """Scan a raw/ sub-folder and list all .md/.txt files with their status."""
+    from core.wiki_io import scan_sources
+    sources = scan_sources(folder=folder)
+    ingested_hashes: dict[str, str] = {}
+    # Reuse _get_ingested_hashes if available
+    try:
+        ingested_hashes = _get_ingested_hashes()
+    except Exception:
+        pass
+
+    files = []
+    for src in sources:
+        status = "pending"
+        prev_hash = ingested_hashes.get(src.path)
+        if prev_hash:
+            status = "ingested" if prev_hash == src.hash else "modified"
+
+        files.append({
+            "path": src.path,
+            "hash": src.hash[:12],
+            "status": status,
+            "size": (_raw_root() / src.path).stat().st_size if (_raw_root() / src.path).exists() else 0,
+        })
+
+    return {"folder": folder or "/", "files": files, "count": len(files)}
 
 
 # ============================================================================
