@@ -1,6 +1,9 @@
 # Wiki Index
+## entity
+- [[iscopymode-computed]] – Computed property detecting copy mode in Vue forms.
 ## other
 - [[2025-01-14_1035_vue-component-refactor-copy-mode-fix.md]] – Source document: Vue Promotion Form refactoring and copy mode bug fix.
+- [[2025-05-20_1035_vue-component-refactor-copy-mode-fix]] – Source: Vue Promotion Form refactoring and copy mode bug fix.
 - [[2025-05-20_1035_vue-component-refactor-copy-mode-fix.md]] – Source document (2025-05-20) on refactoring the Promotion Form, including design decisions, risk assessment, and open questions.
 - [[2026-05-13_1100_promotion_dynamic_search_options.md]] – Source: implementation of dynamic search dropdown options on the promotion list page via condition_types API.
 - [[2026-05-13_1435_promotion_export_csv.md]] – Implementation of backend streaming CSV export for promotions, using GET /api/v1/backend/promotion/download.
@@ -21,10 +24,13 @@
 - [[State-Space-Models.md]] – Recurrent models with linear state transitions, predecessors to Mamba.
 - [[Transformer]] – Neural network architecture using self-attention, dispensing with recurrence, and achieving state-of-the-art on machine translation.
 - [[URL Array Parameter Parsing in FastAPI]] – How to correctly parse repeated query parameters using multi_items()
+- [[default-filter-data]] – Constant defining the default filter structure in Promotion Form.
 - [[mamba-paper.md]] – Source document: Mamba paper introducing selective state spaces for linear-time sequence modeling.
 - [[promotion-form-vue.md]] – Promotion Form.vue component, handling create/edit/copy modes with props editModel, rowId, rowData.
+- [[transform-quantity-type]] – Helper function for quantity type transformation in Promotion Form.
+- [[transform-tier-data]] – Helper function for tier data transformation in Promotion Form.
+- [[transform-to-form-data]] – Unified data transformation function for Promotion Form.
+- [[transformer-paper]] – Source summary of Vaswani et al. (2017) introducing the Transformer architecture and its foundations.
 - [[vue-component-refactor-patterns.md]] – Refactoring patterns: extracting helper functions, constants, and computed properties for clarity.
 - [[vue-mode-pattern.md]] – Pattern for distinguishing forms modes (create, edit, copy) using three props and computed isCopyMode.
 - [[数量阶梯折扣.md]] – Tiered discount pricing based on sample count, with two levels triggered by volume thresholds.
-## source_summary
-- [[transformer-paper]] – Source summary of Vaswani et al. (2017) introducing the Transformer architecture and its foundations.

@@ -611,6 +611,10 @@ async def page_branches(request: Request):
 async def health():
     return {"status": "ok"}
 
+@app.get("/log", response_class=HTMLResponse)
+async def page_log(request: Request):
+    return _render("log.html")
+
 @app.get("/config", response_class=HTMLResponse)
 async def page_config(request: Request):
     return _render("config.html")

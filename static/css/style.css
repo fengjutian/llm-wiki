@@ -16,6 +16,20 @@ body{
   background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh;
   transition:background var(--transition-speed),color var(--transition-speed);
 }
+
+/* ===================================================================
+   Custom Scrollbar — WebKit (Chrome/Edge/Safari)
+   =================================================================== */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;transition:background var(--transition-speed)}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+::-webkit-scrollbar-thumb:active{background:var(--accent)}
+::-webkit-scrollbar-corner{background:transparent}
+
+/* Firefox scrollbar */
+*{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 
