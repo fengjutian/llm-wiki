@@ -37,7 +37,7 @@ sources: ["2025-05-20_1035_vue-component-refactor-copy-mode-fix.md"]
 
 **核心判断依据**：`rowId === null && rowData !== null` → 复制模式
 
-## Bug 修复
+## 修复   
 
 ### 问题 1：复制模式标题显示错误
 

@@ -237,9 +237,9 @@ async def api_read_raw_file(filename: str):
         )
     try:
         content = fp.read_text(encoding="utf-8")
+        return {"filename": filename, "content": content, "size": len(content)}
     except Exception as exc:
         return JSONResponse({"error": "read failed: " + str(exc), "filename": filename}, status_code=500)
-        return {"filename": filename, "content": content, "size": len(content)}
 
 
 @app.delete("/api/raw/files/{filename:path}")
