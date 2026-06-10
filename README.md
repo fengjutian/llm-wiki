@@ -180,6 +180,113 @@ poetry run uvicorn app.main:app --reload --port 8080
 >
 > — Andrej Karpathy
 
+---
 
-$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
-npm run build:win
+## 技术栈
+
+### 架构总览
+
+```mermaid
+graph TB
+    subgraph 前端["🖥️ Web UI"]
+        J2["Jinja2 模板"]
+        D3["D3.js 图谱"]
+        API["Swagger /docs"]
+    end
+
+    subgraph 后端["⚙️ FastAPI"]
+        INGEST["Ingest 引擎"]
+        QUERY["Query 引擎"]
+        LINT["Lint 引擎"]
+        WATCH["Folder Watcher"]
+    end
+
+    subgraph 核心["🧠 Core"]
+        LLM["LLM Client<br/>OpenAI 兼容 API"]
+        GRAPH["Graph Engine<br/>NetworkX"]
+        GIT["Git 版本控制<br/>GitPython"]
+        IO["Wiki I/O<br/>Markdown + YAML"]
+    end
+
+    subgraph 存储["💾 Storage"]
+        RAW["raw/<br/>原始文档（只读）"]
+        WIKI["wiki/<br/>结构化知识库"]
+        SCHEMA["CLAUDE.md<br/>Schema 规范"]
+    end
+
+    前端 --> 后端
+    后端 --> 核心
+    核心 --> 存储
+    LLM -->|"DeepSeek / OpenAI / Ollama"| EXT["☁️ LLM API"]
+```
+
+### 各层技术选型
+
+| 层级 | 技术 | 选型理由 |
+|------|------|----------|
+| **Web 框架** | FastAPI + Uvicorn | 异步高性能、自动生成 Swagger 文档、类型安全 |
+| **模板引擎** | Jinja2 | 轻量、与 FastAPI 深度集成、支持模板继承 |
+| **图谱可视化** | D3.js (力导向图) | 交互式拖拽缩放、支持搜索高亮、纯前端渲染 |
+| **图谱引擎** | NetworkX (DiGraph) | Python 最成熟的图算法库、支持路径查找/中心度/孤立检测 |
+| **LLM 客户端** | OpenAI SDK | 兼容所有 OpenAI 格式 API（DeepSeek / OpenAI / Ollama / LM Studio） |
+| **LLM 模型** | DeepSeek V4 Pro（大模型）+ GPT-4o-mini（小模型） | 大模型做 ingest/lint 复杂任务，小模型做 query/摘要，节约成本 |
+| **Token 估算** | tiktoken | 调用前估算上下文用量，防止超出预算 |
+| **版本控制** | Git (GitPython) | 每次 ingest 自动 commit，支持分支实验 → 审核 → 合并 |
+| **数据存储** | Markdown 文件 + YAML frontmatter | 纯文本、人类可读、兼容 Obsidian、Git 友好 |
+| **配置管理** | Pydantic Settings + .env | 类型校验、环境变量覆盖、settings.json Web UI 热更新 |
+| **文件夹监听** | watchfiles | 高效文件系统事件监控，自动触发 ingest |
+| **异步 I/O** | aiofiles | 非阻塞文件读写，不阻塞 FastAPI 事件循环 |
+| **CSS 主题** | CSS 变量 + data-theme | 深色/浅色一键切换、跟随系统偏好、localStorage 持久化 |
+
+### 实体关系抽取流程
+
+```
+源文档 (raw/*.md)
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  LLM Ingest Prompt                  │
+│  ├─ 注入 CLAUDE.md Schema           │
+│  ├─ 注入已有 Wiki 页面（最多 50 页）  │
+│  └─ JSON Mode 严格输出               │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  LLM 输出 (structured JSON)         │
+│  ├─ source_summary: 文档摘要         │
+│  ├─ new_pages[]: 实体页 + 概念页     │
+│  │   └─ 内容含 [[wikilink]] 交叉引用  │
+│  ├─ updated_pages[]: 需更新的旧页    │
+│  ├─ contradictions[]: 矛盾标注       │
+│  └─ relationships[]: 关系类型声明     │
+└─────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  Graph Engine (NetworkX)            │
+│  ├─ 正则解析 [[wikilink]] → 有向边   │
+│  ├─ frontmatter relations → 类型边   │
+│  └─ 支持: 反向链接 / 孤立检测 / 路径  │
+└─────────────────────────────────────┘
+```
+
+### 页面类型体系
+
+| 类型 | 用途 | 命名示例 |
+|------|------|----------|
+| `entity` | 具体事物：模型、人物、论文、工具 | `Transformer.md` |
+| `concept` | 抽象概念或技术 | `Self-Attention.md` |
+| `source_summary` | 消化后的源文档摘要 | `transformer-paper.md` |
+| `overview` | 跨来源的综合主题 | `Overview-LLM-Architecture.md` |
+| `comparison` | 并排对比 | `GPT-vs-BERT.md` |
+
+### 关系类型
+
+| 类型 | 含义 | 示例 |
+|------|------|------|
+| `references` | A 引用了 B（默认 wikilink） | `[[Transformer]]` → `[[Self-Attention]]` |
+| `supports` | A 的证据支持 B 的结论 | 新实验 → 旧假设 |
+| `contradicts` | A 的结论与 B 冲突 | 新论文 → 旧结论 |
+| `extends` | A 在 B 基础上扩展 | `Multi-Head Attention` → `Self-Attention` |
+| `supersedes` | A 取代了 B | 新版方法 → 旧版方法 |
