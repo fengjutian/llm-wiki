@@ -666,6 +666,11 @@ async def page_home():
     return _render("index.html")
 
 
+@app.get("/wikifile", response_class=HTMLResponse)
+async def page_wikifile(request: Request):
+    return _render("index.html")
+
+
 @app.get("/page/{name:path}", response_class=HTMLResponse)
 async def page_view(name: str):
     from core.wiki_io import read_page as io_read_page
