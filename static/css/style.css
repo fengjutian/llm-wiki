@@ -144,7 +144,70 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent)}
 }
 @keyframes toast-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
+/* ===================================================================
+   Drawer / 抽屉面板 (图谱视图文章详情)
+   =================================================================== */
+.drawer-overlay{
+    position:fixed;top:0;left:0;right:0;bottom:0;z-index:90;
+    background:rgba(0,0,0,.45);
+    opacity:0;visibility:hidden;
+    transition:opacity .3s ease,visibility .3s ease;
+}
+.drawer-overlay-visible{opacity:1;visibility:visible}
+
+.drawer{
+    position:fixed;top:0;right:0;bottom:0;z-index:95;
+    width:min(520px,90vw);
+    background:var(--surface);
+    border-left:1px solid var(--border);
+    display:flex;flex-direction:column;
+    transform:translateX(100%);
+    transition:transform .3s cubic-bezier(.4,0,.2,1);
+    box-shadow:-4px 0 24px rgba(0,0,0,.3);
+}
+.drawer-open{transform:translateX(0)}
+
+.drawer-header{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:clamp(12px,2vw,20px) clamp(16px,2.5vw,24px);
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+}
+.drawer-header h2{
+    font-size:clamp(16px,2vw,20px);
+    margin:0;padding:0;border:none;
+    word-break:break-word;
+    flex:1;margin-right:12px;
+}
+
+.drawer-meta{
+    padding:8px clamp(16px,2.5vw,24px);
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+    display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+}
+
+.drawer-body{
+    flex:1;overflow-y:auto;
+    padding:clamp(12px,2vw,20px) clamp(16px,2.5vw,24px);
+}
+.drawer-body pre{
+    background:var(--bg);
+    border-radius:var(--radius);
+    padding:16px;
+}
+.drawer-body .wikilink{color:var(--accent);cursor:pointer}
+.drawer-body .wikilink:hover{opacity:.85;text-decoration:underline}
+
+.drawer-links{
+    padding:0 clamp(16px,2.5vw,24px) clamp(12px,2vw,20px);
+    flex-shrink:0;
+}
+.drawer-links .card{margin-bottom:0}
+
 @media(max-width:768px){
+  .drawer{width:100vw}
+  .drawer-header h2{font-size:16px}
   .app{flex-direction:column}
   .sidebar{width:100%;position:static;flex-direction:row;flex-wrap:wrap;overflow-x:auto}
   .sidebar-header{width:100%}

@@ -427,3 +427,15 @@ Top issues:
   [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
   [warning] orphan: Page 'Attention Is All You Need (Transformer Paper)' has no incoming links
 
+## [2026-06-10 12:47] lint | Health check | branch: main
+Score: D | Critical: 4 | Warnings: 16 | Info: 1
+Wiki size: 33 pages, 54 links
+Auto-fix: no
+Issue types: orphan: 14, dead_link: 4, missing_ref: 2, inconsistency: 1
+Top issues:
+  [warning] orphan: Page '2025-05-20 Source: Vue Promotion Form 重构与复制模式修复' has no incoming links
+  [warning] orphan: Page '2025-05-20_1035 Vue Component Refactor Copy Mode Fix' has no incoming links
+  [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
+  [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
+  [warning] orphan: Page 'Attention Is All You Need (Transformer Paper)' has no incoming links
+
