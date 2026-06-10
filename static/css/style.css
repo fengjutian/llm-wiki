@@ -205,6 +205,24 @@ textarea:focus,input:focus{outline:none;border-color:var(--accent)}
 }
 .drawer-links .card{margin-bottom:0}
 
+/* ===================================================================
+   Hover Tooltip / 悬浮提示 (Wiki 浏览器页面摘要)
+   =================================================================== */
+.hover-tooltip{
+    position:fixed;
+    z-index:85;
+    max-width:320px;
+    background:var(--surface);
+    border:1px solid var(--accent);
+    border-radius:var(--radius);
+    padding:clamp(10px,1.5vw,14px);
+    box-shadow:0 4px 20px rgba(0,0,0,.35);
+    pointer-events:auto;
+    animation:tooltip-in .15s ease;
+}
+@keyframes tooltip-in{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+.hover-tooltip .tag{font-size:10px}
+
 @media(max-width:768px){
   .drawer{width:100vw}
   .drawer-header h2{font-size:16px}

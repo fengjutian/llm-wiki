@@ -7,24 +7,22 @@
     <div id="page-list" class="loading">加载中...</div>
 </div>
 
-<!-- Preview Modal -->
-<div id="preview-modal" class="modal modal-hidden">
-    <div class="modal-overlay" onclick="closePreviewModal()"></div>
-    <div class="modal-content card" style="max-height:85vh">
-        <div class="card-header card-header-row">
-            <span id="preview-title" style="font-size:17px">📄 页面预览</span>
-            <button class="btn btn-sm" onclick="closePreviewModal()">✕</button>
-        </div>
-        <!-- 元数据区 -->
-        <div id="preview-meta" style="margin-bottom:12px"></div>
-        <!-- 摘要 -->
+<!-- Preview Drawer (右侧) -->
+<div id="preview-overlay" class="drawer-overlay" onclick="closePreviewDrawer()"></div>
+<div id="preview-drawer" class="drawer" style="z-index:100">
+    <div class="drawer-header">
+        <h2 id="preview-title">📄 页面预览</h2>
+        <button class="btn btn-sm" onclick="closePreviewDrawer()" title="关闭">✕</button>
+    </div>
+    <div class="drawer-meta" id="preview-meta"></div>
+    <div class="drawer-body" id="preview-body">
         <div id="preview-summary" style="margin-bottom:12px;padding:12px;background:rgba(88,166,255,.06);border-left:3px solid var(--accent);border-radius:6px;display:none"></div>
-        <!-- 正文 -->
-        <div id="preview-body" style="max-height:50vh;overflow:auto">
-            <pre id="preview-content" style="white-space:pre-wrap;word-break:break-word;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:13px;margin:0">加载中...</pre>
-        </div>
+        <pre id="preview-content" style="white-space:pre-wrap;word-break:break-word;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:13px;margin:0">加载中...</pre>
     </div>
 </div>
+
+<!-- Hover tooltip -->
+<div id="hover-tooltip" class="hover-tooltip" style="display:none"></div>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -35,17 +33,19 @@ function escapeHtml(s) { const d=document.createElement('div');d.textContent=s;r
 function escapeJs(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"'); }
 
 // ===================================================================
-// Preview modal
+// Preview drawer (右侧)
 // ===================================================================
-function showPreviewModal(title) {
+function openPreviewDrawer(title) {
     document.getElementById('preview-title').innerHTML = '📄 ' + escapeHtml(title);
     document.getElementById('preview-meta').innerHTML = '';
     document.getElementById('preview-summary').style.display = 'none';
     document.getElementById('preview-content').textContent = '加载中...';
-    document.getElementById('preview-modal').classList.remove('modal-hidden');
+    document.getElementById('preview-drawer').classList.add('drawer-open');
+    document.getElementById('preview-overlay').classList.add('drawer-overlay-visible');
 }
-function closePreviewModal() {
-    document.getElementById('preview-modal').classList.add('modal-hidden');
+function closePreviewDrawer() {
+    document.getElementById('preview-drawer').classList.remove('drawer-open');
+    document.getElementById('preview-overlay').classList.remove('drawer-overlay-visible');
 }
 
 const typeIcons={entity:'🏷️',concept:'💡',source_summary:'📋',overview:'🗺️',comparison:'⚖️'};
@@ -53,7 +53,7 @@ const typeLabels={entity:'实体',concept:'概念',source_summary:'源摘要',ov
 const statusLabels={draft:'草稿',active:'活跃',stale:'过时',contradicted:'矛盾',archived:'归档'};
 
 async function previewWikiPage(title) {
-    showPreviewModal(title);
+    openPreviewDrawer(title);
     try {
         const resp = await fetch('/api/wiki/preview/' + encodeURIComponent(title));
         if (!resp.ok) { throw new Error('页面不存在 (' + resp.status + ')'); }
@@ -109,6 +109,65 @@ async function previewWikiPage(title) {
 }
 
 // ===================================================================
+// Hover tooltip
+// ===================================================================
+let hoverTimer = null;
+window._wikiPages = {};  // title -> page data for hover lookup
+
+function showHoverTooltip(e, el) {
+    clearTimeout(hoverTimer);
+    const title = el.dataset.pageTitle || '';
+    const page = window._wikiPages[title] || {};
+    const tooltip = document.getElementById('hover-tooltip');
+    const summary = page.summary || '暂无摘要';
+    const pageType = page.page_type || '';
+    const pageStatus = page.status || '';
+    const updatedAt = page.updated_at || '';
+
+    let html = '';
+    if (pageType) html += '<span class="tag tag-' + pageType + '" style="margin-right:4px">' + pageType + '</span>';
+    if (pageStatus) html += '<span class="tag tag-' + pageStatus + '">' + pageStatus + '</span>';
+    html += '<p style="margin-top:6px;font-size:13px;line-height:1.5;color:var(--text)">' + escapeHtml(summary) + '</p>';
+    if (updatedAt) html += '<div style="margin-top:6px;font-size:11px;color:var(--muted)">🕐 ' + escapeHtml(updatedAt) + '</div>';
+    html += '<div style="margin-top:4px;font-size:11px;color:var(--muted)">💡 点击查看完整内容</div>';
+
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+
+    // Position tooltip to the right of the mouse cursor
+    let left = e.clientX + 16;
+    let top = e.clientY - 10;
+
+    // Keep tooltip within viewport
+    const tw = tooltip.offsetWidth || 280;
+    const th = tooltip.offsetHeight || 100;
+    if (left + tw > window.innerWidth - 16) {
+        left = e.clientX - tw - 16;
+    }
+    if (top + th > window.innerHeight - 16) {
+        top = window.innerHeight - th - 16;
+    }
+    if (top < 8) top = 8;
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+}
+
+function hideHoverTooltip() {
+    hoverTimer = setTimeout(function() {
+        document.getElementById('hover-tooltip').style.display = 'none';
+    }, 150);
+}
+
+// Keep tooltip visible when hovering over it
+document.getElementById('hover-tooltip').addEventListener('mouseenter', function() {
+    clearTimeout(hoverTimer);
+});
+document.getElementById('hover-tooltip').addEventListener('mouseleave', function() {
+    this.style.display = 'none';
+});
+
+// ===================================================================
 // Load page list
 // ===================================================================
 fetch('/api/wiki/pages')
@@ -116,13 +175,17 @@ fetch('/api/wiki/pages')
   .then(d=>{
     let html='<ul class="page-list">';
     d.pages.forEach(p=>{
+      // Store for hover lookup
+      window._wikiPages[p.title] = p;
+
       let tags=[];
       if(p.page_type) tags.push(`<span class="tag tag-${p.page_type}">${p.page_type}</span>`);
       if(p.status) tags.push(`<span class="tag tag-${p.status}">${p.status}</span>`);
       const titleJs = escapeJs(p.title);
-      html+=`<li style="cursor:pointer" onclick="previewWikiPage('${titleJs}')" title="点击预览页面">`;
-      html+=`<span style="color:var(--accent);font-weight:500;text-underline-offset:4px;text-decoration-color:var(--border)">${escapeHtml(p.title)}</span> ${tags.join(' ')}`;
-      html+=`<br><small style="color:var(--muted)">${escapeHtml(p.summary||'')}</small></li>`;
+      html+=`<li style="cursor:pointer" onclick="previewWikiPage('${titleJs}')"
+        data-page-title="${escapeHtml(p.title)}"
+        onmouseenter="showHoverTooltip(event, this)" onmouseleave="hideHoverTooltip()">`;
+      html+=`<span style="color:var(--accent);font-weight:500;text-underline-offset:4px;text-decoration-color:var(--border)">${escapeHtml(p.title)}</span> ${tags.join(' ')}</li>`;
     });
     html+='</ul>';
     if(d.pages.length===0) html='<p style="color:var(--muted)">暂无页面。请先 <a href="/ingest">上传</a> 一些源文档。</p>';
@@ -130,9 +193,9 @@ fetch('/api/wiki/pages')
     document.getElementById('page-list').classList.remove('loading');
   });
 
-// Close modal with Escape key
+// Close drawer with Escape key
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closePreviewModal();
+    if (e.key === 'Escape') closePreviewDrawer();
 });
 </script>
 {% endblock %}
