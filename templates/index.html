@@ -125,7 +125,7 @@ fetch('/api/wiki/pages')
       html+=`<br><small style="color:var(--muted)">${escapeHtml(p.summary||'')}</small></li>`;
     });
     html+='</ul>';
-    if(d.pages.length===0) html='<p style="color:var(--muted)">暂无页面。请先 <a href="/ingest">Ingest</a> 一些源文档。</p>';
+    if(d.pages.length===0) html='<p style="color:var(--muted)">暂无页面。请先 <a href="/ingest">上传</a> 一些源文档。</p>';
     document.getElementById('page-list').innerHTML=html;
     document.getElementById('page-list').classList.remove('loading');
   });
