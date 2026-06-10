@@ -48,6 +48,9 @@ function findPython() {
 function startBackend() {
   const python = findPython();
   const args = ['-m', 'uvicorn', 'app.main:app', '--host', HOST, '--port', String(PORT), '--log-level', 'info'];
+  if (DEV_MODE) {
+    args.push('--reload');
+  }
 
   console.log(`[LLM Wiki] Starting backend: ${python} ${args.join(' ')}`);
 

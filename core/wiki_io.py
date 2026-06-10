@@ -334,12 +334,14 @@ def append_log(entry: LogEntry) -> None:
 
 
 def read_log(last_n: int = 20) -> list[LogEntry]:
-    """Read the most recent N log entries."""
+    """Read the most recent N log entries, newest first."""
     lp = _log_path()
     if not lp.exists():
         return []
     entries = parse_log()
-    return entries[-last_n:]
+    # Reverse: newest first
+    entries.reverse()
+    return entries[:last_n]
 
 
 def parse_log() -> list[LogEntry]:

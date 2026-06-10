@@ -53,6 +53,7 @@ async def create_new_branch(req: CreateBranchRequest):
     """Create a new branch and switch to it."""
     try:
         repo = open_wiki_repo()
+        prev = current_branch(repo)
         name = create_branch(repo, req.name)
 
         append_log(
@@ -61,7 +62,7 @@ async def create_new_branch(req: CreateBranchRequest):
                 operation="branch_create",
                 title=req.name,
                 branch=req.name,
-                details=f"Created branch from {current_branch(repo)}",
+                details=f"Created branch '{req.name}' from '{prev}'",
             )
         )
         return {"branch": name, "status": "created"}
@@ -74,8 +75,19 @@ async def checkout_branch(name: str):
     """Switch to an existing branch."""
     try:
         repo = open_wiki_repo()
+        prev = current_branch(repo)
         checkout(repo, name)
-        return {"branch": current_branch(repo), "status": "checked_out"}
+        cur = current_branch(repo)
+        append_log(
+            LogEntry(
+                timestamp=format_log_timestamp(),
+                operation="checkout",
+                title=f"{prev} → {cur}",
+                branch=cur,
+                details=f"Switched from {prev} to {cur}",
+            )
+        )
+        return {"branch": cur, "status": "checked_out"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -96,7 +108,7 @@ async def merge_branch(name: str, req: MergeRequest = MergeRequest(source_branch
                 operation="merge",
                 title=f"{source} → {current_branch(repo)}",
                 branch=current_branch(repo),
-                details=f"Merged {source} into {current_branch(repo)}",
+                details=f"Merged branch '{source}' into '{current_branch(repo)}'",
             )
         )
         return {"status": "merged", "source": source, "target": current_branch(repo)}

@@ -234,13 +234,31 @@ def ingest_source(
         )
 
     # 8. Log
+    src_path_obj = settings.raw_root / source_path
+    src_size = src_path_obj.stat().st_size if src_path_obj.exists() else 0
+    src_size_str = f"{src_size / 1024:.1f} KB" if src_size >= 1024 else f"{src_size} B"
+    detail_parts = [
+        f"Status: {status}",
+        f"Source hash: {result.source_hash[:12]}",
+        f"Source size: {src_size_str}",
+        f"New pages ({len(result.new_pages)}): " + (", ".join(result.new_pages) if result.new_pages else "\u2014"),
+        f"Updated pages ({len(result.updated_pages)}): " + (", ".join(result.updated_pages) if result.updated_pages else "\u2014"),
+    ]
+    if result.contradictions:
+        contra_summaries = []
+        for c in result.contradictions[:5]:
+            if isinstance(c, dict):
+                contra_summaries.append(c.get("description", c.get("title", "?")))
+            else:
+                contra_summaries.append(str(c))
+        detail_parts.append(f"Contradictions ({len(result.contradictions)}): " + "; ".join(contra_summaries))
     append_log(
         LogEntry(
             timestamp=format_log_timestamp(),
             operation="ingest",
             title=source_path,
             branch=settings.wiki_branch,
-            details=f"Status: {status} | New: {len(result.new_pages)} | Updated: {len(result.updated_pages)} | Contradictions: {len(result.contradictions)}",
+            details="\n".join(detail_parts),
         )
     )
 
@@ -314,12 +332,19 @@ def query_wiki(
         }
         write_page(WikiPage(title=q_title, content=answer, frontmatter=fm))
 
+        answer_excerpt = answer[:200].replace("\n", " ") + ("..." if len(answer) > 200 else "")
+        detail_parts = [
+            f"Question: {question[:200]}",
+            f"Answer excerpt: {answer_excerpt}",
+            f"Sources ({len(result.sources)}): " + (", ".join(result.sources[:10]) if result.sources else "\u2014"),
+            "Written back: yes",
+        ]
         append_log(
             LogEntry(
                 timestamp=format_log_timestamp(),
                 operation="query",
                 title=q_title[:100],
-                details=f"Sources: {', '.join(result.sources[:10])}",
+                details="\n".join(detail_parts),
             )
         )
         result.written_back = True
@@ -459,12 +484,29 @@ def lint_wiki(*, auto_fix: bool = False) -> LintReport:
         score = "F"
 
     # --- Log ---
+    info_count = sum(1 for i in issues if i.severity == 'info')
+    from collections import Counter
+    type_counts = Counter(i.type for i in issues)
+    type_breakdown = ", ".join(f"{t}: {c}" for t, c in type_counts.most_common(8))
+    nodes = stats.get("nodes", "?")
+    edges = stats.get("edges", "?")
+    detail_parts = [
+        f"Score: {score} | Critical: {critical} | Warnings: {warnings} | Info: {info_count}",
+        f"Wiki size: {nodes} pages, {edges} links",
+        f"Auto-fix: {'yes' if auto_fix else 'no'}",
+        f"Issue types: {type_breakdown}" if type_breakdown else "Issue types: \u2014",
+    ]
+    # Top critical/warning issues
+    top_issues = [i for i in issues if i.severity in ('critical', 'warning')][:5]
+    if top_issues:
+        issue_lines = [f"  [{i.severity}] {i.type}: {i.description[:120]}" for i in top_issues]
+        detail_parts.append("Top issues:\n" + "\n".join(issue_lines))
     append_log(
         LogEntry(
             timestamp=format_log_timestamp(),
             operation="lint",
             title="Health check",
-            details=f"Score: {score} | Critical: {critical} | Warnings: {warnings} | Info: {sum(1 for i in issues if i.severity=='info')}",
+            details="\n".join(detail_parts),
         )
     )
 
