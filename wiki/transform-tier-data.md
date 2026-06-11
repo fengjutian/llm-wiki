@@ -1,20 +1,20 @@
 ---
-created_at: 2026-06-10 01:52
+created_at: 2026-06-11 09:13
 page_type: entity
 sources:
 - file: 2025-05-20_1035_vue-component-refactor-copy-mode-fix.md
-  hash: b68218f954363745488cb4ba13d185953d6e2c113ae686a3c3b1468d7f2a69d3
+  hash: a59bfb2d9f3d1493f9b43ead5aeb1475bb2f11d133b65cdfdc22e33bfaacc922
 status: draft
 summary: ''
 title: transform-tier-data
-updated_at: 2026-06-10 01:52
+updated_at: 2026-06-11 09:13
 ---
 
 ---
 title: "transform-tier-data"
 page_type: entity
 status: active
-summary: "A helper function in the Promotion Form component that encapsulates tier data transformation logic."
+summary: "Helper function in Promotion Form that converts API tier data into the form's tier structure."
 sources:
   - file: "2025-05-20_1035_vue-component-refactor-copy-mode-fix.md"
     hash: ""
@@ -24,17 +24,22 @@ confidence: high
 
 # transform-tier-data
 
-`transform-tier-data` is a helper function extracted during the refactoring of `Form.vue` in the Promotion module. It handles the transformation of tier-related data (e.g., tier discounts) from the raw format to the form format.
+A helper function extracted during the Promotion Form refactoring. It converts backend tier data (from the API) into the form's tier configuration object. 
 
-## Purpose
-- Eliminate ~40 lines of duplicate transformation logic between the Edit and Copy modes in `getData`.
-- Improve maintainability and testability.
+## Input
+- Array of tier objects from the backend, each containing `min_price`, `max_price`, `discount_type`, `discount_value`.
 
-## Usage
-Called within `transformToFormData()` or directly in `getData` to process tier arrays.
+## Output
+- Frontend tier structure with:
+  - `infinity` flag when `max_price` is `null`.
+  - Discount types mapped to `discount_value1` (percent), `discount_value2` (fixed), `discount_value3` (per_fixed).
 
-## Related
-- [[Promotion Form Component (Form.vue)]] – component where it is used
-- [[Vue Component Refactoring Patterns]] – part of the "Extract Helper Functions" pattern
+## Rationale
+This logic was originally duplicated in both Copy and Edit paths (about 40 lines). Extracting it into a reusable function eliminated duplication and made the `getData` method shrink from 120 to 45 lines.
+
+## See Also
 - [[transform-quantity-type]]
 - [[transform-to-form-data]]
+- [[Promotion Form Component (Form.vue)]]
+- [[Sales Amount Tier]]
+- [[TransformTierForSubmit]]

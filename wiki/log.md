@@ -446,3 +446,66 @@ Source size: 15 B
 New pages (0): —
 Updated pages (0): —
 
+## [2026-06-11 08:26] ingest | 项目安装 | branch: main
+Status: pending
+Source hash: 356758e4dd47
+Source size: 1.5 KB
+New pages (4): Go (Programming Language), winget, opencodereview, Go Build Ldflags
+Updated pages (0): —
+
+## [2026-06-11 08:58] ingest | 消费金额分层（sales_amount tier）功能详细分析.md | branch: main
+Status: pending
+Source hash: 53e0fa680bf2
+Source size: 22.3 KB
+New pages (3): Sales Amount Tier, PromotionTier, PromotionService
+Updated pages (2): transform-tier-data, Promotion Form Component (Form.vue)
+
+## [2026-06-11 09:01] ingest | 消费金额分层（sales_amount tier）功能详细分析.md | branch: main
+Status: pending
+Source hash: 53e0fa680bf2
+Source size: 22.3 KB
+New pages (7): TransformTierForSubmit, Exceeding Tier, PromotionRequest, PromotionCondition, PromotionUsage, PromotionError, DiscountType
+Updated pages (3): Sales Amount Tier, Promotion Form Component (Form.vue), PromotionService
+
+## [2026-06-11 09:07] ingest | UnitOfWork 解释.md | branch: main
+Status: pending
+Source hash: defbf23f1c2f
+Source size: 3.1 KB
+New pages (5): UnitOfWork 解释, AsyncUnitOfWork, get_uow, UnitOfWork (type alias), FastAPI Dependency Injection Alias Pattern
+Updated pages (0): —
+
+## [2026-06-11 09:09] ingest | 2025-05-20_1430_register_form_draft.md | branch: main
+Status: pending
+Source hash: 1108e878826e
+Source size: 3.0 KB
+New pages (12): RegisterFormDraft, RegisterFormDraftRepo, Register Form Draft Service, Register Form Draft API Endpoints, State Branch Logic in Register Form Draft, Frequency Limiting (60s per email), Field Whitelist, Upsert Strategy for Drafts, Soft Delete Drafts, SQLModel Index and sa_column Conflict, verify_email Table, user Table (Registration Context)
+Updated pages (0): —
+
+## [2026-06-11 09:11] ingest | 2026-05-13_1026_promotion_tracking_export.md | branch: main
+Status: pending
+Source hash: 9113bdb7c381
+Source size: 2.4 KB
+New pages (8): Promotion Tracking CSV 流式导出功能设计文档, Promotion Tracking Export Endpoint, CouponService, CouponRepo, Iter Paged Export, Streaming Export Response, promotion-tracking.vue, DRY Repository SQL Builder Pattern
+Updated pages (0): —
+
+## [2026-06-11 09:13] ingest | 2025-05-20_1035_vue-component-refactor-copy-mode-fix.md | branch: main
+Status: modified
+Source hash: a59bfb2d9f3d
+Source size: 3.5 KB
+New pages (5): transform-tier-data, transform-quantity-type, transform-to-form-data, Vue Mode Pattern (Create/Edit/Copy), Vue Component Refactoring Patterns
+Updated pages (0): —
+
+## [2026-06-11 09:15] ingest | 20260106_154500_promotion-copy-code-duplicate-bug.md | branch: main
+Status: pending
+Source hash: cc978571e75a
+Source size: 6.6 KB
+New pages (4): 2026-01-06 Source: Promotion Copy Code Duplicate Bug, ID Retention in Copy Mode (id-保留问题), Uniqueness Check Logic Vulnerability (唯一性检查逻辑漏洞), Copy Scenario Data Isolation Pattern (复制场景数据隔离模式)
+Updated pages (1): Promotion Form Component (Form.vue)
+
+## [2026-06-11 09:17] ingest | promotion 与 promotion code 两张表.md | branch: main
+Status: pending
+Source hash: 00a9bbc851c7
+Source size: 4.7 KB
+New pages (3): 2026-05-15 Source: promotion 与 promotion code 两张表, Promotion (Database Table), Order (Database Table)
+Updated pages (0): —
+
