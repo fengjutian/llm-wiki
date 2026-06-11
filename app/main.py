@@ -175,14 +175,28 @@ async def api_ingest_folder(request: Request):
 @app.post("/api/raw/upload")
 async def api_upload_raw(file: UploadFile = File(...)):
     """Upload a file to the raw/ directory."""
+    # Validate filename
+    if not file.filename or not file.filename.strip():
+        return JSONResponse(
+            {"error": "文件名不能为空"},
+            status_code=400,
+        )
+    # Sanitize: strip path separators to prevent directory traversal
+    safe_name = Path(file.filename).name
+    if not safe_name or safe_name in (".", ".."):
+        return JSONResponse(
+            {"error": f"无效的文件名: {file.filename!r}"},
+            status_code=400,
+        )
+
     settings = get_settings()
     settings.raw_root.mkdir(parents=True, exist_ok=True)
-    dest = settings.raw_root / file.filename
+    dest = settings.raw_root / safe_name
     content = await file.read()
     async with aiofiles.open(dest, "wb") as f:
         await f.write(content)
-    logger.info("Uploaded raw file: %s (%d bytes)", file.filename, len(content))
-    return {"filename": file.filename, "size": len(content), "status": "uploaded"}
+    logger.info("Uploaded raw file: %s (%d bytes)", safe_name, len(content))
+    return {"filename": safe_name, "size": len(content), "status": "uploaded"}
 
 
 @app.get("/api/raw/files")
