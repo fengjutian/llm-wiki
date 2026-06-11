@@ -509,3 +509,10 @@ Source size: 4.7 KB
 New pages (3): 2026-05-15 Source: promotion 与 promotion code 两张表, Promotion (Database Table), Order (Database Table)
 Updated pages (0): —
 
+## [2026-06-11 09:18] ingest | Product List 与 Product Category 分析.md | branch: main
+Status: pending
+Source hash: 06681690f68f
+Source size: 3.3 KB
+New pages (3): Product List, Product Category, Source: Product List 与 Product Category 分析
+Updated pages (0): —
+

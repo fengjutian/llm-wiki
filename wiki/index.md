@@ -1,6 +1,4 @@
 # Wiki Index
-## entity
-- [[Order (Database Table)]] – Database table for customer orders; includes promotion_code field referencing Promotion table.
 ## other
 - [[2025-01-14_1035_vue-component-refactor-copy-mode-fix.md]] – Source document: Vue Promotion Form refactoring and copy mode bug fix.
 - [[2025-05-20_1035_vue-component-refactor-copy-mode-fix]] – Source: Vue Promotion Form refactoring and copy mode bug fix.
@@ -31,7 +29,10 @@
 - [[Iter Paged Export]] – Utility for batch-reading database results for streaming exports.
 - [[Mamba.md]] – Architecture combining selective SSMs and hardware-aware algorithm to achieve O(N) sequence modeling.
 - [[Multi-Head-Attention]] – Parallel attention projections enabling joint attention to different representation subspaces.
+- [[Order (Database Table)]] – Database table for customer orders; includes promotion_code field referencing Promotion table.
 - [[Positional-Encoding]] – Sinusoidal encodings added to input embeddings to convey token position in non-recurrent models.
+- [[Product-Category]] – Tree-structured category table (product_categories) used to classify products.
+- [[Product-List]] – Database table and module for individual products, with fields like name, price, and a category_id foreign key.
 - [[Project Installation (项目安装)]] – Installation of Go 1.26.4 and compilation of opencodereview with version ldflags.
 - [[Promotion (Database Table)]] – Core database table storing promotions; uses promotion_type to differentiate promotion, referral_code, and coupon_code.
 - [[Promotion Export Endpoint]] – GET /backend/promotion/download streaming CSV with group filter and array fix
@@ -85,3 +86,5 @@
 - [[vue-mode-pattern.md]] – Pattern for distinguishing forms modes (create, edit, copy) using three props and computed isCopyMode.
 - [[winget]] – Windows Package Manager used to install Go.
 - [[数量阶梯折扣.md]] – Tiered discount pricing based on sample count, with two levels triggered by volume thresholds.
+## source_summary
+- [[Source-Product-List-Product-Category-Analysis]] – Analysis of Product List and Product Category modules, their tables, and 1:N relationship.
