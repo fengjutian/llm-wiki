@@ -391,7 +391,16 @@ async function doPasteIngest() {
         var formData = new FormData();
         formData.append('file', blob, srcName);
         var saveResp = await fetch('/api/raw/upload', { method: 'POST', body: formData });
-        var saveData = await saveResp.json();
+        if (!saveResp.ok) {
+            var saveErr = await saveResp.text();
+            throw new Error('服务器错误 (' + saveResp.status + '): ' + saveErr.substring(0, 300));
+        }
+        var saveData;
+        try {
+            saveData = await saveResp.json();
+        } catch (e) {
+            throw new Error('保存响应不是合法 JSON: ' + (await saveResp.text()).substring(0, 300));
+        }
         if (saveData.status !== 'uploaded') {
             showResult('错误', {status: 'error', errors: ['保存文件失败: ' + JSON.stringify(saveData)]});
             return;
