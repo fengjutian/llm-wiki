@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Lint - LLM Wiki{% endblock %}
+{% block content %}
+<h1>🔍 Lint 仪表盘</h1>
+
+<div class="lint-actions">
+    <button class="btn btn-primary" onclick="runLint(false)" id="btn-lint">🔍 运行健康检查</button>
+    <button class="btn" onclick="runLint(true)" id="btn-fix">🔧 运行并自动修复</button>
+    <span class="lint-hint">点击按钮触发检查，检查时切换其他页面，完成后会发通知。</span>
+</div>
+
+<div id="report" class="lint-report">
+    <div class="lint-empty">
+        <div class="lint-empty-icon">🩺</div>
+        <p>点击上方按钮运行健康检查…</p>
+        <p class="lint-empty-sub">结合图谱结构检查 + LLM 语义分析，发现孤立页、死链、矛盾等。</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pollTimer = null;
+let currentReport = null;
+let currentFilter = 'all';
+let currentGroupBy = 'severity';
+let currentSearch = '';
+let currentSort = 'severity';
+let selectedIssueIdx = null;
+
+(function(){
+    const pending = sessionStorage.getItem('lint_pending_task');
+    if (pending) {
+        try {
+            const t = JSON.parse(pending);
+            sessionStorage.removeItem('lint_pending_task');
+            pollLintTask(t.taskId, t.autoFix);
+            return;
+        } catch(e) {}
+    }
+    const stored = sessionStorage.getItem('lint_last_result');
+    if (stored) {
+        try { renderReport(JSON.parse(stored)); } catch(e) {}
+    }
+})();
+
+async function runLint(autoFix) {
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    showLoading(autoFix);
+    document.getElementById('btn-lint').disabled = true;
+    document.getElementById('btn-fix').disabled = true;
+
+    try {
+        const resp = await fetch('/api/wiki/lint', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({auto_fix: autoFix, async: true})
+        });
+        const data = await resp.json();
+        if (data.task_id) {
+            sessionStorage.setItem('lint_pending_task', JSON.stringify({taskId: data.task_id, autoFix: autoFix}));
+            pollLintTask(data.task_id, autoFix);
+        }
+    } catch(e) {
+        document.getElementById('report').innerHTML =
+            '<div class="card lint-error"><div class="card-header">⚠️ 启动失败</div>' +
+            '<p>' + escapeHtml(e.message) + '</p></div>';
+        enableButtons();
+    }
+}
+
+async function pollLintTask(taskId, autoFix) {
+    try {
+        const resp = await fetch('/api/wiki/lint/status/' + taskId);
+        if (!resp.ok) { throw new Error('status check failed'); }
+        const data = await resp.json();
+
+        if (data.status === 'done' && data.result) {
+            sessionStorage.removeItem('lint_pending_task');
+            sessionStorage.setItem('lint_last_result', JSON.stringify(data.result));
+            renderReport(data.result);
+            enableButtons();
+            window.dispatchEvent(new CustomEvent('lint-done', {detail: data.result}));
+        } else if (data.status === 'error') {
+            document.getElementById('report').innerHTML =
+                '<div class="card lint-error"><div class="card-header">⚠️ 检查失败</div>' +
+                '<p>' + escapeHtml(data.error || 'unknown') + '</p></div>';
+            enableButtons();
+            sessionStorage.removeItem('lint_pending_task');
+        } else {
+            pollTimer = setTimeout(function(){ pollLintTask(taskId, autoFix); }, 2000);
+        }
+    } catch(e) {
+        pollTimer = setTimeout(function(){ pollLintTask(taskId, autoFix); }, 3000);
+    }
+}
+
+function enableButtons() {
+    document.getElementById('btn-lint').disabled = false;
+    document.getElementById('btn-fix').disabled = false;
+}
+
+function showLoading(autoFix) {
+    document.getElementById('report').innerHTML =
+        '<div class="card lint-loading-card">' +
+            '<div class="lint-loading-orb"><div class="spinner"></div></div>' +
+            '<div class="lint-loading-text">' +
+                '<h3>' + (autoFix ? '🔧 正在检查并自动修复…' : '🔍 正在运行健康检查…') + '</h3>' +
+                '<p>LLM 语义分析 + 图谱结构检查，可能需要 30–60 秒。</p>' +
+                '<p class="lint-loading-tip">💡 你可以<a href="/" style="color:var(--accent)">切换到其他页面</a>，检查完成后会自动通知。</p>' +
+            '</div>' +
+        '</div>';
+}
+</script>
+{% endblock %}
