@@ -124,20 +124,14 @@ function createWindow() {
     title: 'LLM Wiki',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
     show: false,
-    // Hide the native menu bar; the renderer draws its own themed top bar.
-    // `hiddenInset` keeps macOS traffic-light buttons but hides the rest.
-    titleBarStyle: 'hiddenInset',
-    // Modern Windows 11 look: empty title bar with a configurable overlay area.
-    // The renderer paints a custom top bar; we keep the overlay transparent so
-    // the React header aligns with the OS controls.
-    ...(process.platform === 'win32' && {
-      titleBarOverlay: {
-        color: '#00000000',
-        symbolColor: '#9ca3af',
-        height: 40,
-      },
-    }),
-    ...(isMac && { trafficLightPosition: { x: 14, y: 12 } }),
+    // On Windows/Linux `titleBarStyle: 'hiddenInset'` is treated as `default`
+    // by Electron (it only hides on macOS), so the OS title bar would still
+    // show up. Strip the entire OS chrome with `frame: false` and let the
+    // React TopBar (with its own min/max/close buttons) take over. macOS
+    // keeps `hiddenInset` so the traffic-light buttons remain clickable.
+    ...(isMac
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 12 } }
+      : { frame: false }),
   };
   mainWindow = new BrowserWindow(winOpts);
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { api } from '../api/client'
+import { useThemeStore } from '../stores/themeStore'
 import type { GraphData, GraphNode } from '../api/types'
 
 export default function GraphPage() {
@@ -11,6 +12,8 @@ export default function GraphPage() {
   const [dims, setDims] = useState({ w: 800, h: 600 })
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<any>(null)
+  const theme = useThemeStore(s => s.theme)
+  const isDark = theme === 'dark'
 
   useEffect(() => {
     api.get<GraphData>('/api/graph').then(d => { setData(d); setLoading(false) })
@@ -36,16 +39,16 @@ export default function GraphPage() {
   const handleNodeClick = useCallback((n: any) => setSelectedNode(n as GraphNode), [])
 
   return (
-    <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 100px)' }}>
+    <div className="flex flex-col h-full">
       <div className="flex items-center gap-4 mb-4 shrink-0">
         <h1 className="text-2xl font-bold">Knowledge Graph</h1>
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Filter nodes..." className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-cyan-500 w-48"/>
+          placeholder="Filter nodes..." className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-cyan-500 w-48"/>
         {data && <span className="text-xs text-gray-500">{data.nodes.length} nodes, {data.edges.length} edges</span>}
         <button onClick={() => graphRef.current?.zoomToFit(400)} className="text-xs text-gray-500 hover:text-cyan-600 dark:hover:text-cyan-400">Fit view</button>
       </div>
       {loading ? <p className="text-gray-500">Loading graph...</p> : data ? (
-        <div ref={containerRef} className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden relative">
+        <div ref={containerRef} className="flex-1 min-h-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden relative">
           <ForceGraph2D
             ref={graphRef}
             graphData={{
@@ -64,10 +67,10 @@ export default function GraphPage() {
               ctx.beginPath()
               ctx.arc(n.x!, n.y!, Math.max(3, 6 / Math.sqrt(scale)), 0, 2 * Math.PI)
               ctx.fill()
-              ctx.fillStyle = '#e0e0e0'
+              ctx.fillStyle = isDark ? '#e0e0e0' : '#1f2937'
               ctx.fillText(label, n.x!, n.y! + Math.max(3, 6 / Math.sqrt(scale)) + fontSize * 0.6)
             }}
-            linkColor={() => '#30363d'}
+            linkColor={() => isDark ? '#30363d' : '#d1d5db'}
             linkDirectionalArrowLength={4}
             linkDirectionalArrowRelPos={1}
             onNodeClick={handleNodeClick}
@@ -76,7 +79,7 @@ export default function GraphPage() {
             height={dims.h}
           />
           {selectedNode && (
-            <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-xl max-w-xs">
+            <div className="absolute top-4 right-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-xl max-w-xs">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-bold text-sm">{selectedNode.title}</h3>
                 <button onClick={() => setSelectedNode(null)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">&times;</button>
