@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import WorkspaceSwitcher from './WorkspaceSwitcher'
 import ThemeToggle from './ThemeToggle'
 import HealthBadge from './HealthBadge'
 
@@ -21,6 +22,9 @@ export default function Sidebar() {
         <NavLink to="/" className="text-lg font-bold text-cyan-400 hover:text-cyan-300">
           📚 LLM Wiki
         </NavLink>
+      </div>
+      <div className="px-2 pt-2 pb-1 border-b border-gray-800">
+        <WorkspaceSwitcher />
       </div>
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
         {NAV.map(({ to, label, icon }) => (

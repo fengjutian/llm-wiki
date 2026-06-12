@@ -30,6 +30,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('shortcut:new-page', handler)
   },
 
+  // Menu: open workbench page
+  onOpenWorkbench: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu:open-workbench', handler)
+    return () => ipcRenderer.removeListener('menu:open-workbench', handler)
+  },
+
   // Theme events — returns unsubscribe function
   onThemeChange: (callback) => {
     const handler = (_, theme) => callback(theme)

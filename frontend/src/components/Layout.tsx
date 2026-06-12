@@ -1,8 +1,11 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Toast from './Toast'
+import { useElectronMenu } from '../hooks/useElectronMenu'
 
 export default function Layout() {
+  useElectronMenu()
+
   return (
     <div className="flex h-screen">
       <Sidebar />

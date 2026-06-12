@@ -221,6 +221,12 @@ function buildMenu() {
       ]
     },
     {
+      label: 'Workbench',
+      submenu: [
+        { label: 'Manage Projects...', click: () => mainWindow?.webContents.send('menu:open-workbench') },
+      ]
+    },
+    {
       label: 'Help',
       submenu: [
         { label: 'About LLM Wiki', click: () => dialog.showMessageBox(mainWindow, { title: 'About', message: 'LLM Wiki', detail: `Version ${app.getVersion()}\n\nLLM-powered structured knowledge base.` }) },
