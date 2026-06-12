@@ -82,6 +82,16 @@ class Settings(BaseSettings):
     graph_cache_enabled: bool = True
 
     # ------------------------------------------------------------------
+    # RAG (Retrieval-Augmented Generation)
+    # ------------------------------------------------------------------
+    rag_enabled: bool = True
+    rag_chunk_size: int = 500
+    rag_chunk_overlap: int = 50
+    rag_top_k: int = 5
+    rag_embedding_model: str = ""  # empty = auto-detect from llm_small_model
+    rag_persist_dir: str = "./rag_index"
+
+    # ------------------------------------------------------------------
     # Derived / helper
     # ------------------------------------------------------------------
     @property
