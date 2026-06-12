@@ -27,6 +27,8 @@ export default function WorkspaceSwitcher() {
       await activate(name)
       addToast(`已切换到「${name}」`)
       setOpen(false)
+      // Reload so all pages re-fetch data from the new workspace
+      setTimeout(() => window.location.reload(), 300)
     } catch {
       addToast('切换失败')
     }

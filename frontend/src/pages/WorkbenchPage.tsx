@@ -25,6 +25,7 @@ export default function WorkbenchPage() {
     try {
       await activate(projectName)
       addToast(`已切换到「${projectName}」`)
+      setTimeout(() => window.location.reload(), 300)
     } catch {
       addToast('切换失败')
     }
