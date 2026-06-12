@@ -39,8 +39,8 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className="p-3 border-t border-gray-800 space-y-2">
-        <HealthBadge />
         <ThemeToggle />
+        <HealthBadge />
       </div>
     </aside>
   )
