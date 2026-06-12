@@ -1,4 +1,4 @@
-"""LLM Wiki – FastAPI application entry point."""
+﻿"""LLM Wiki – FastAPI application entry point."""
 
 import asyncio
 import logging
@@ -10,6 +10,8 @@ from typing import Optional
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import aiofiles
 
 from core.config import get_settings, load_user_config, save_user_config
@@ -28,6 +30,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # ---------------------------------------------------------------------------
 # Background task store (lint, ingest, etc.)
@@ -81,9 +84,29 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="LLM Wiki", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+_static_dir = BASE_DIR / "static"
+_static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
 
 # ============================================================================
-# API — Wiki core
+# Template helper (no request in context 鈥?avoids "unhashable type: dict")
+# ============================================================================
+
+def _render(template_name: str, context: dict | None = None) -> HTMLResponse:
+    try:
+        tmpl = templates.get_template(template_name)
+        html = tmpl.render(*(context or {}).items() if context else {})
+        # Actually, just render with context as kwargs
+        html = tmpl.render(**(context or {}))
+        return HTMLResponse(html)
+    except Exception as e:
+        logger.warning("Template '%s' failed: %s", template_name, e)
+        return HTMLResponse(f"<h1>LLM Wiki</h1><p>Template error: {e}</p><p><a href='/docs'>API Docs</a></p>")
+
+
+# ============================================================================
+# API 鈥?Wiki core
 # ============================================================================
 
 from api.wiki import ingest_source, query_wiki, lint_wiki  # noqa: E402
@@ -565,7 +588,7 @@ async def api_test_connection():
 
     settings = get_settings()
     if not settings.llm_api_key:
-        return {"ok": False, "error": "API Key 未配置，请先保存配置"}
+        return {"ok": False, "error": "API Key 鏈厤缃紝璇峰厛淇濆瓨閰嶇疆"}
 
     client = get_llm_client()
     t0 = time.time()
@@ -686,7 +709,80 @@ app.include_router(workbench_router)
 app.include_router(rag_router)
 
 
+# ============================================================================
+# Frontend pages (Jinja2 fallback — only when React dist is not built)
+# ============================================================================
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+
+if not FRONTEND_DIST.exists():
+
+    @app.get("/", response_class=HTMLResponse)
+    async def page_home():
+        return _render("index.html")
+
+
+    @app.get("/wikifile", response_class=HTMLResponse)
+    async def page_wikifile(request: Request):
+        return _render("index.html")
+
+
+    @app.get("/page/{name:path}", response_class=HTMLResponse)
+    async def page_view(name: str):
+        from core.wiki_io import read_page as io_read_page
+        page = io_read_page(name)
+        if not page:
+            return HTMLResponse(f"<h1>404</h1><p>Page '{name}' not found.</p>", status_code=404)
+        try:
+            tmpl = templates.get_template("page.html")
+            html = tmpl.render(page=page)
+            return HTMLResponse(html)
+        except Exception as e:
+            logger.warning("Template 'page.html' failed: %s", e)
+            return HTMLResponse(f"<h1>{page.title}</h1><pre>{page.content[:5000]}</pre>")
+
+
+    @app.get("/workbench", response_class=HTMLResponse)
+    async def page_workbench(request: Request):
+        return _render("workbench.html")
+
+
+    @app.get("/graph", response_class=HTMLResponse)
+    async def page_graph(request: Request):
+        return _render("graph.html")
+
+
+    @app.get("/ingest", response_class=HTMLResponse)
+    async def page_ingest(request: Request):
+        return _render("ingest.html")
+
+
+    @app.get("/raw", response_class=HTMLResponse)
+    async def page_raw(request: Request):
+        return _render("raw.html")
+
+
+    @app.get("/query", response_class=HTMLResponse)
+    async def page_query(request: Request):
+        return _render("query.html")
+
+
+    @app.get("/lint", response_class=HTMLResponse)
+    async def page_lint(request: Request):
+        return _render("lint.html")
+
+
+    @app.get("/branches", response_class=HTMLResponse)
+    async def page_branches(request: Request):
+        return _render("branches.html")
+
+
+    @app.get("/log", response_class=HTMLResponse)
+    async def page_log(request: Request):
+        return _render("log.html")
+
+    @app.get("/config", response_class=HTMLResponse)
+    async def page_config(request: Request):
+        return _render("config.html")
 
 
 @app.get("/health")
@@ -695,19 +791,21 @@ async def health():
 
 
 # ============================================================================
-# React SPA — serve built frontend
+# React SPA — serve built frontend when available
 # ============================================================================
 
+if FRONTEND_DIST.exists():
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        """Serve React SPA for non-API, non-static routes."""
+        file_path = FRONTEND_DIST / full_path
+        if file_path.is_file():
+            from fastapi.responses import FileResponse
+            return FileResponse(file_path)
+        index = FRONTEND_DIST / "index.html"
+        if index.exists():
+            return HTMLResponse(index.read_text(encoding="utf-8"))
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404)
 
-@app.get("/{full_path:path}")
-async def spa_fallback(full_path: str):
-    """Serve React SPA for non-API routes."""
-    file_path = FRONTEND_DIST / full_path
-    if file_path.is_file():
-        from fastapi.responses import FileResponse
-        return FileResponse(file_path)
-    index = FRONTEND_DIST / "index.html"
-    if index.exists():
-        return HTMLResponse(index.read_text(encoding="utf-8"))
-    from fastapi import HTTPException
-    raise HTTPException(status_code=404)
+
