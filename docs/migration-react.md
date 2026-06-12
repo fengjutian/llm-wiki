@@ -261,9 +261,9 @@ app/main.py 新增:
       server: {
         port: 5173,
         proxy: {
-          '/api': 'http://127.0.0.1:8080',
-          '/static': 'http://127.0.0.1:8080',
-          '/health': 'http://127.0.0.1:8080',
+          '/api': 'http://127.0.0.1:8089',
+          '/static': 'http://127.0.0.1:8089',
+          '/health': 'http://127.0.0.1:8089',
         },
       },
       build: { outDir: 'dist', assetsDir: 'assets' },

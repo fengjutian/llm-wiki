@@ -14,7 +14,7 @@ interface MenuAction {
 type MenuItem = MenuAction | { separator: true; id: string }
 
 const HOST = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1'
-const PORT = 8080
+const PORT = 8089
 
 const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
 

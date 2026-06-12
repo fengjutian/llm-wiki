@@ -291,12 +291,12 @@ export default defineConfig({
   fullyParallel: true,
   retries: 1,
   use: {
-    baseURL: 'http://127.0.0.1:8080',
+    baseURL: 'http://127.0.0.1:8089',
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'poetry run uvicorn app.main:app --host 127.0.0.1 --port 8080',
-    url: 'http://127.0.0.1:8080/health',
+    command: 'poetry run uvicorn app.main:app --host 127.0.0.1 --port 8089',
+    url: 'http://127.0.0.1:8089/health',
     reuseExistingServer: true,
   },
 })

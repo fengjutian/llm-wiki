@@ -5,7 +5,7 @@ const http = require('http');
 const fs = require('fs');
 
 const HOST = '127.0.0.1';
-const PORT = 8080;
+const PORT = 8089;
 const VITE_PORT = 5173;
 const DEV_MODE = !app.isPackaged;
 

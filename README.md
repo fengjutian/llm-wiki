@@ -47,10 +47,10 @@ LLM_SMALL_MODEL=gpt-4o-mini   # 轻量任务用小模型，省钱
 ### 3. 启动
 
 ```bash
-poetry run uvicorn app.main:app --port 8080
+poetry run uvicorn app.main:app --port 8089
 ```
 
-打开 **http://127.0.0.1:8080**
+打开 **http://127.0.0.1:8089**
 
 ---
 
@@ -82,7 +82,7 @@ cp your-paper.md raw/
 打开 `/ingest` 页面，输入源文档文件名，点击执行。或通过 API：
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/wiki/ingest \
+curl -X POST http://127.0.0.1:8089/api/wiki/ingest \
   -H "Content-Type: application/json" \
   -d '{"source_path": "transformer-paper.md"}'
 ```
@@ -206,7 +206,7 @@ llm-wiki/
 poetry run pytest tests/ -v
 
 # 开发模式启动（热重载）
-poetry run uvicorn app.main:app --reload --port 8080
+poetry run uvicorn app.main:app --reload --port 8089
 ```
 
 详见 `docs/requirements.md`（需求）和 `docs/tasks.md`（任务拆解）。
