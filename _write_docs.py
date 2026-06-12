@@ -1,0 +1,1 @@
+[cache hygiene: omitted completed write.content argument, 11.5KB, approx 3020 token(s), 348 line(s); see following tool result] preview="#!/usr/bin/env python3 \"\"\"Write migration and test docs to docs/ directory.\"\"\" import os def write_migration(): path = os.path.join(\"docs\""
