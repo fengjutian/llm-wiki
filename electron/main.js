@@ -35,7 +35,7 @@ const OFFLINE_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>LL
 </style></head><body><div class="box"><h1>&#x1F4DA; LLM Wiki</h1>
 <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 <p>Waiting for backend server to start&hellip;</p><p id="status"></p>
-<button class="btn" onclick="location.href=`http://${HOST}:${PORT}`">Retry</button></div>
+<button class="btn" onclick="location.href=\`http://${HOST}:${PORT}\`">Retry</button></div>
 <script>var n=0;setInterval(function(){n++;document.getElementById('status').textContent='Attempt '+n+' of 30...'},1000)</script></body></html>`;
 
 // ---------------------------------------------------------------------------

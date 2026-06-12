@@ -72,6 +72,7 @@ class RAGEngine:
         self._settings = get_settings()
         self._collection = None
         self._embedding_model = None
+        self._embedding_failed = False
         self._hash_cache: dict[str, str] = {}
         self._load_hash_cache()
 
@@ -153,14 +154,15 @@ class RAGEngine:
         try:
             embeddings = self._embed_texts(texts)
         except Exception as e:
-            return {
-                "status": "error",
-                "error": f"Embedding failed: {e}. Set rag_embedding_model in settings.json to a model that supports /embeddings (e.g. text-embedding-3-small on OpenAI).",
-                "model_tried": self._get_embedding_model(),
-            }
+            logger.warning("Embedding failed, storing without vectors: %s", e)
+            self._embedding_failed = True
+            embeddings = None
 
-        # Store
-        col.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
+        # Store — works with or without embeddings
+        if embeddings:
+            col.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
+        else:
+            col.upsert(ids=ids, documents=texts, metadatas=metadatas)
         col.modify(metadata={"last_indexed": time.strftime("%Y-%m-%d %H:%M:%S")})
 
         # Update hash cache
@@ -180,6 +182,45 @@ class RAGEngine:
             "elapsed_seconds": elapsed,
         }
 
+    def _keyword_search(self, query: str, top_k: int) -> list[dict]:
+        """Simple keyword-based search when embeddings are unavailable.
+        Uses TF-IDF-like scoring: word overlap + position bonus."""
+        col = self._get_collection()
+        if not col:
+            return []
+        try:
+            results = col.get(include=["documents", "metadatas"])
+        except Exception:
+            return []
+
+        docs = results.get("documents", [])
+        metas = results.get("metadatas", [])
+        if not docs:
+            return []
+
+        # Tokenize query into lowercase words
+        query_words = set(query.lower().split())
+        if not query_words:
+            return []
+
+        scored = []
+        for i, doc in enumerate(docs):
+            doc_lower = doc.lower()
+            # Word overlap score
+            score = sum(1 for w in query_words if w in doc_lower) / max(len(query_words), 1)
+            # Bonus for exact phrase match
+            if query.lower() in doc_lower:
+                score += 0.3
+            if score > 0:
+                scored.append({
+                    "text": doc,
+                    "meta": metas[i] if i < len(metas) else {},
+                    "score": min(score, 1.0),
+                })
+
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        return scored[:top_k]
+
     def query(self, question: str, top_k: int | None = None) -> RAGResult:
         """RAG query: embed question, search, prompt LLM."""
         top_k = top_k or self.settings.rag_top_k
@@ -187,27 +228,36 @@ class RAGEngine:
         if not col or col.count() == 0:
             return RAGResult(answer="RAG index is empty. Build it first via /api/rag/index.", sources=[])
 
-        # Embed question
-        q_embedding = self._embed_texts([question])[0]
-
-        # Search
-        results = col.query(query_embeddings=[q_embedding], n_results=min(top_k, col.count()))
-
-        chunks_texts = results.get("documents", [[]])[0] or []
-        metadatas = results.get("metadatas", [[]])[0] or []
-        distances = results.get("distances", [[]])[0] or []
-
+        # Try vector search first, fall back to keyword
         sources = []
         context_parts = []
-        for i, (text, meta, dist) in enumerate(zip(chunks_texts, metadatas, distances)):
-            score = round(1.0 / (1.0 + dist), 4) if dist else 0.0
-            sources.append({
-                "file": meta.get("file", "?"),
-                "chunk_index": meta.get("chunk_idx", i),
-                "score": score,
-                "text": text[:300],
-            })
-            context_parts.append(f"[Source: {meta.get('file', '?')}]\n{text}")
+        try:
+            q_embedding = self._embed_texts([question])[0]
+            results = col.query(query_embeddings=[q_embedding], n_results=min(top_k, col.count()))
+            chunks_texts = results.get("documents", [[]])[0] or []
+            metadatas = results.get("metadatas", [[]])[0] or []
+            distances = results.get("distances", [[]])[0] or []
+
+            for i, (text, meta, dist) in enumerate(zip(chunks_texts, metadatas, distances)):
+                score = round(1.0 / (1.0 + dist), 4) if dist else 0.0
+                sources.append({
+                    "file": meta.get("file", "?"),
+                    "chunk_index": meta.get("chunk_idx", i),
+                    "score": score,
+                    "text": text[:300],
+                })
+                context_parts.append(f"[Source: {meta.get('file', '?')}]\n{text}")
+        except Exception:
+            # Fall back to keyword search
+            kw_results = self._keyword_search(question, top_k)
+            for r in kw_results:
+                sources.append({
+                    "file": r["meta"].get("file", "?"),
+                    "chunk_index": r["meta"].get("chunk_idx", 0),
+                    "score": round(r["score"], 4),
+                    "text": r["text"][:300],
+                })
+                context_parts.append(f"[Source: {r['meta'].get('file', '?')}]\n{r['text']}")
 
         # Format prompt
         context = "\n\n---\n\n".join(context_parts)
@@ -321,7 +371,10 @@ class RAGEngine:
                 client.delete_collection(name)
             except Exception:
                 pass
-        self._collection = client.get_or_create_collection(name=name)
+        self._collection = client.get_or_create_collection(
+            name=name,
+            embedding_function=None,
+        )
         return self._collection
 
     def _get_collection(self):

@@ -1,0 +1,1 @@
+[cache hygiene: omitted completed write.content argument, 3.8KB, approx 1034 token(s), 119 line(s); see following tool result] preview="import re p = 'core/rag.py' with open(p, encoding='utf-8') as f: c = f.read() # Patch 1: add _embedding_failed flag to __init__ old_init = 's"
