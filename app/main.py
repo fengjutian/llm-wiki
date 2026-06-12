@@ -110,6 +110,7 @@ def _render(template_name: str, context: dict | None = None) -> HTMLResponse:
 # ============================================================================
 
 from api.wiki import ingest_source, query_wiki, lint_wiki  # noqa: E402
+from core.llm import get_llm_client, QUERY_SYSTEM_PROMPT  # noqa: E402
 
 
 @app.post("/api/wiki/ingest")
@@ -389,6 +390,41 @@ async def api_query(request: Request):
     body = await request.json()
     result = query_wiki(body.get("question", ""), write_back=body.get("write_back", False))
     return {"question": result.question, "answer": result.answer, "sources": result.sources, "written_back": result.written_back}
+
+
+@app.post("/api/wiki/query/stream")
+async def api_query_stream(request: Request):
+    """Stream query response via SSE (Server-Sent Events)."""
+    from fastapi.responses import StreamingResponse
+    body = await request.json()
+    question = body.get("question", "")
+    if not question:
+        return {"answer": "", "sources": []}
+
+    wiki_pages = _collect_existing_pages()
+    client = get_llm_client()
+
+    async def generate():
+        try:
+            schema = client._load_schema()
+            system = QUERY_SYSTEM_PROMPT.format(schema=schema, wiki_pages=wiki_pages)
+            for chunk in client.chat_completion_stream(
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": question},
+                ],
+                task="query",
+            ):
+                yield f"data: {chunk}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/wiki/lint")
@@ -746,4 +782,24 @@ async def page_log(request: Request):
 @app.get("/config", response_class=HTMLResponse)
 async def page_config(request: Request):
     return _render("config.html")
+
+
+# ============================================================================
+# React SPA — serve built frontend when available
+# ============================================================================
+FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+
+if FRONTEND_DIST.exists():
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        """Serve React SPA for non-API, non-static routes."""
+        file_path = FRONTEND_DIST / full_path
+        if file_path.is_file():
+            from fastapi.responses import FileResponse
+            return FileResponse(file_path)
+        index = FRONTEND_DIST / "index.html"
+        if index.exists():
+            return HTMLResponse(index.read_text(encoding="utf-8"))
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404)
 

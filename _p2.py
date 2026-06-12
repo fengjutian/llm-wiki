@@ -1,0 +1,1 @@
+[cache hygiene: omitted completed write.content argument, 9.7KB, approx 2513 token(s), 320 line(s); see following tool result] preview="import os src = 'frontend/src' def w(path, content): full = os.path.join(src, path) os.makedirs(os.path.dirname(full), exist_ok=True) with open(full, 'w'"
