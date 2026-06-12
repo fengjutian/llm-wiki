@@ -1,17 +1,36 @@
 @import 'tailwindcss';
 
+/*
+ * Enable class-based dark mode in Tailwind v4.
+ * Default is prefers-color-scheme:media; we want <html class="dark"> to drive it.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --sidebar-w: 240px;
     --header-h: 48px;
   }
+
+  /* Smooth transition on theme switch */
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling — adapts to theme */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+.dark ::-webkit-scrollbar-thumb { background: #4b5563; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
 
 /* Toast animation */
 @keyframes toast-in { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }

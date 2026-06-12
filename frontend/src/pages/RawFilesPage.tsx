@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api/client'
 import { useToastStore } from '../stores/toastStore'
 
@@ -25,12 +25,20 @@ const statusLabels: Record<string, string> = {
   modified: '已修改',
 }
 
+type ModalKind = 'viewRaw' | 'editRaw' | 'viewWiki' | 'editWiki' | null
+
 export default function RawFilesPage() {
   const [rawFiles, setRawFiles] = useState<RawFile[]>([])
   const [wikiFiles, setWikiFiles] = useState<WikiFile[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const addToast = useToastStore(s => s.add)
+
+  // Modal state
+  const [modal, setModal] = useState<ModalKind>(null)
+  const [modalTarget, setModalTarget] = useState('')
+  const [modalContent, setModalContent] = useState('')
+  const [modalLoading, setModalLoading] = useState(false)
 
   useEffect(() => { loadFiles() }, [])
 
@@ -61,7 +69,123 @@ export default function RawFilesPage() {
     loadFiles()
   }
 
+  // --- Raw file actions ---
+
+  const viewRaw = useCallback(async (path: string) => {
+    setModalTarget(path)
+    setModal('viewRaw')
+    setModalLoading(true)
+    try {
+      const d = await api.get<{content: string; filename: string}>('/api/raw/preview/' + encodeURIComponent(path))
+      setModalContent(d.content || '')
+    } catch {
+      addToast(`Failed to read: ${path}`)
+      setModalContent('')
+      setModal(null)
+    }
+    setModalLoading(false)
+  }, [addToast])
+
+  const editRaw = useCallback(async (path: string) => {
+    setModalTarget(path)
+    setModal('editRaw')
+    setModalLoading(true)
+    try {
+      const d = await api.get<{content: string; filename: string}>('/api/raw/preview/' + encodeURIComponent(path))
+      setModalContent(d.content || '')
+    } catch {
+      addToast(`Failed to read: ${path}`)
+      setModalContent('')
+      setModal(null)
+    }
+    setModalLoading(false)
+  }, [addToast])
+
+  const saveRaw = async () => {
+    try {
+      await api.put<{status: string}>('/api/raw/files/' + encodeURIComponent(modalTarget), { content: modalContent })
+      addToast(`Saved: ${modalTarget}`)
+      setModal(null)
+      loadFiles()
+    } catch {
+      addToast(`Failed to save: ${modalTarget}`)
+    }
+  }
+
+  const deleteRaw = async (path: string) => {
+    if (!confirm(`确定要删除 "${path}" 吗？此操作不可撤销。`)) return
+    try {
+      await api.del<{status: string}>('/api/raw/files/' + encodeURIComponent(path))
+      addToast(`Deleted: ${path}`)
+      loadFiles()
+    } catch {
+      addToast(`Failed to delete: ${path}`)
+    }
+  }
+
+  // --- Wiki file actions ---
+
+  const viewWiki = useCallback(async (title: string) => {
+    setModalTarget(title)
+    setModal('viewWiki')
+    setModalLoading(true)
+    try {
+      const d = await api.get<{content: string; title: string}>('/api/wiki/preview/' + encodeURIComponent(title))
+      setModalContent(d.content || '')
+    } catch {
+      addToast(`Failed to read: ${title}`)
+      setModalContent('')
+      setModal(null)
+    }
+    setModalLoading(false)
+  }, [addToast])
+
+  const editWiki = useCallback(async (title: string) => {
+    setModalTarget(title)
+    setModal('editWiki')
+    setModalLoading(true)
+    try {
+      const d = await api.get<{content: string; title: string}>('/api/wiki/preview/' + encodeURIComponent(title))
+      setModalContent(d.content || '')
+    } catch {
+      addToast(`Failed to read: ${title}`)
+      setModalContent('')
+      setModal(null)
+    }
+    setModalLoading(false)
+  }, [addToast])
+
+  const saveWiki = async () => {
+    try {
+      await api.put<{status: string}>('/api/wiki/pages/' + encodeURIComponent(modalTarget), { content: modalContent })
+      addToast(`Saved: ${modalTarget}`)
+      setModal(null)
+      loadFiles()
+    } catch {
+      addToast(`Failed to save: ${modalTarget}`)
+    }
+  }
+
+  const deleteWiki = async (title: string) => {
+    if (!confirm(`确定要删除 "${title}" 吗？此操作不可撤销。`)) return
+    try {
+      await api.del<{status: string}>('/api/wiki/pages/' + encodeURIComponent(title))
+      addToast(`Deleted: ${title}`)
+      loadFiles()
+    } catch {
+      addToast(`Failed to delete: ${title}`)
+    }
+  }
+
+  const closeModal = () => {
+    setModal(null)
+    setModalContent('')
+  }
+
   const formatSize = (b: number) => b < 1024 ? `${b}B` : `${(b/1024).toFixed(1)}KB`
+
+  const isViewing = modal === 'viewRaw' || modal === 'viewWiki'
+  const isEditing = modal === 'editRaw' || modal === 'editWiki'
 
   return (
     <div className="space-y-6">
@@ -87,6 +211,7 @@ export default function RawFilesPage() {
                 <th className="p-3 w-24">Hash</th>
                 <th className="p-3 w-20">Status</th>
                 <th className="p-3">Wiki Pages</th>
+                <th className="p-3 w-28 text-right">Actions</th>
               </tr></thead>
               <tbody>
                 {rawFiles.map(f => (
@@ -106,6 +231,13 @@ export default function RawFilesPage() {
                       {f.wiki_pages.length > 0
                         ? f.wiki_pages.map(p => <span key={p} className="inline-block mr-1 text-cyan-300">[[{p}]]</span>)
                         : <span className="text-gray-600">—</span>}
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <button onClick={() => viewRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="查看">👁</button>
+                        <button onClick={() => editRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="编辑">✏️</button>
+                        <button onClick={() => deleteRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-red-800 text-gray-300 hover:text-red-300" title="删除">🗑</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -127,6 +259,7 @@ export default function RawFilesPage() {
                 <th className="p-3 w-20">Status</th>
                 <th className="p-3 w-20">Size</th>
                 <th className="p-3">Summary</th>
+                <th className="p-3 w-28 text-right">Actions</th>
               </tr></thead>
               <tbody>
                 {wikiFiles.map(w => (
@@ -142,10 +275,59 @@ export default function RawFilesPage() {
                     </td>
                     <td className="p-3 text-gray-400">{formatSize(w.size)}</td>
                     <td className="p-3 text-gray-500 text-xs truncate max-w-xs">{w.summary}</td>
+                    <td className="p-3 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <button onClick={() => viewWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="查看">👁</button>
+                        <button onClick={() => editWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="编辑">✏️</button>
+                        <button onClick={() => deleteWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-red-800 text-gray-300 hover:text-red-300" title="删除">🗑</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* View / Edit Modal */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={closeModal}>
+          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col m-4"
+               onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800 shrink-0">
+              <h3 className="font-semibold text-sm">
+                {isViewing ? '👁 ' : '✏️ '}
+                {modal === 'viewRaw' || modal === 'editRaw' ? 'Raw: ' : 'Wiki: '}
+                <span className="text-cyan-400">{modalTarget}</span>
+              </h3>
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-300 text-lg leading-none">&times;</button>
+            </div>
+            <div className="flex-1 overflow-hidden p-5">
+              {modalLoading ? (
+                <p className="text-gray-500">Loading...</p>
+              ) : isViewing ? (
+                <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono h-full max-h-[65vh] overflow-y-auto">{modalContent}</pre>
+              ) : (
+                <textarea
+                  value={modalContent}
+                  onChange={e => setModalContent(e.target.value)}
+                  className="w-full h-full min-h-[400px] max-h-[65vh] bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-mono resize-none focus:outline-none focus:border-cyan-500"
+                  spellCheck={false}
+                />
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-800 shrink-0">
+              <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300">
+                关闭
+              </button>
+              {isEditing && (
+                <button onClick={modal === 'editRaw' ? saveRaw : saveWiki}
+                  className="px-4 py-2 text-sm rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold">
+                  保存
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

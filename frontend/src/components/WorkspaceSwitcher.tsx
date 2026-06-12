@@ -40,7 +40,7 @@ export default function WorkspaceSwitcher() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-gray-300 hover:text-gray-100 hover:bg-gray-800"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
       >
         <span className="text-base">📁</span>
         <span className="flex-1 text-left truncate">
@@ -50,10 +50,10 @@ export default function WorkspaceSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute left-2 right-2 top-full mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
+        <div className="absolute left-2 right-2 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden">
           {/* Active indicator */}
           {activeProject && (
-            <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-700">
+            <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-200 dark:border-gray-700">
               当前工作目录 · {activeProject.page_count} 个页面
             </div>
           )}
@@ -71,8 +71,8 @@ export default function WorkspaceSwitcher() {
                   onClick={() => p.name !== active && handleActivate(p.name)}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${
                     p.name === active
-                      ? 'bg-cyan-500/10 text-cyan-400 cursor-default'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 cursor-default'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50'
                   }`}
                 >
                   <span>📁</span>
@@ -84,10 +84,10 @@ export default function WorkspaceSwitcher() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-700">
+          <div className="border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={() => { setOpen(false); navigate('/workbench') }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
             >
               <span>＋</span>
               <span>管理工作目录...</span>

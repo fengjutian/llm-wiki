@@ -9,7 +9,7 @@ export default function HealthBadge() {
       .catch(() => setStatus('offline'))
   }, [])
   return (
-    <div className="text-xs text-gray-500 text-center">
+    <div className="text-xs text-gray-500 dark:text-gray-500 text-center">
       {status === 'offline' ? '⚪ Offline' : `📊 ${status}`}
     </div>
   )

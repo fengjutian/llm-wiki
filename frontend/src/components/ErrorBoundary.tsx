@@ -12,11 +12,11 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return this.props.fallback ?? (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-          <h2 className="text-lg font-bold text-red-400 mb-2">Something went wrong</h2>
+        <div className="flex flex-col items-center justify-center h-64 text-gray-600 dark:text-gray-400">
+          <h2 className="text-lg font-bold text-red-500 dark:text-red-400 mb-2">Something went wrong</h2>
           <p className="text-sm mb-4">{this.state.error?.message}</p>
           <button onClick={() => this.setState({ hasError: false, error: null })}
-            className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors">
+            className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-sm transition-colors">
             Try Again
           </button>
         </div>
