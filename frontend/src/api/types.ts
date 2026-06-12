@@ -69,6 +69,21 @@ export interface GraphEdge {
   relation_type: string
 }
 
+/** Active filter state for the Graph page. */
+export interface GraphFilters {
+  search: string
+  pageTypes: string[]
+  statuses: string[]
+  relationTypes: string[]
+}
+
+/** Distinct filter values derived from current graph data. */
+export interface GraphFilterOptions {
+  pageTypes: string[]
+  statuses: string[]
+  relationTypes: string[]
+}
+
 export interface Branch {
   name: string
   is_active: boolean
