@@ -6,6 +6,7 @@ const fs = require('fs');
 
 const HOST = '127.0.0.1';
 const PORT = 8080;
+const VITE_PORT = 5173;
 const DEV_MODE = !app.isPackaged;
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,44 @@ const OFFLINE_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>LL
 // Python backend management
 // ---------------------------------------------------------------------------
 let pythonProcess = null;
+
+// ---------------------------------------------------------------------------
+// Vite dev server (dev mode only) — gives us HMR for the React frontend
+// ---------------------------------------------------------------------------
+let viteProcess = null;
+
+function startVite() {
+  const projectRoot = path.join(__dirname, '..');
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  console.log(`[LLM Wiki] Starting Vite dev server (npm run --prefix frontend dev)`);
+  viteProcess = spawn(npmCmd, ['run', 'dev'], {
+    cwd: projectRoot,
+    shell: true,
+    env: { ...process.env, BROWSER: 'none' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  viteProcess.stdout.on('data', d => console.log(`[Vite] ${d.toString().trim()}`));
+  viteProcess.stderr.on('data', d => console.error(`[Vite:err] ${d.toString().trim()}`));
+  viteProcess.on('close', code => {
+    console.log(`[LLM Wiki] Vite exited: ${code}`);
+    viteProcess = null;
+  });
+  viteProcess.on('error', err => {
+    console.error(`[LLM Wiki] Failed to start Vite: ${err.message}`);
+    viteProcess = null;
+  });
+}
+
+function stopVite() {
+  if (viteProcess) {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', String(viteProcess.pid), '/f', '/t']);
+    } else {
+      viteProcess.kill('SIGTERM');
+    }
+    viteProcess = null;
+  }
+}
 
 function findPython() {
   if (!DEV_MODE) {
@@ -105,6 +144,13 @@ function waitForServer(url, retries = 30, interval = 500) {
   });
 }
 
+// Polls the Vite dev server's / endpoint (or any path) until it responds.
+// Vite itself doesn't have a dedicated health endpoint, so we just hit the
+// index – it serves index.html as soon as the server is up.
+function waitForVite(url, retries = 60, interval = 500) {
+  return waitForServer(url, retries, interval);
+}
+
 // ---------------------------------------------------------------------------
 // Window
 // ---------------------------------------------------------------------------
@@ -138,7 +184,11 @@ function createWindow() {
   // Restore maximized
   if (windowState.isMaximized) mainWindow.maximize();
 
-  mainWindow.loadURL(`http://${HOST}:${PORT}`);
+  // In dev mode, load the Vite dev server (HMR-aware) instead of the static
+  // dist that uvicorn would serve. Vite proxies /api, /static and /health
+  // to the FastAPI backend on PORT, so all endpoints keep working.
+  const url = DEV_MODE ? `http://${HOST}:${VITE_PORT}` : `http://${HOST}:${PORT}`;
+  mainWindow.loadURL(url);
 
   // Show offline page only for initial backend load failures
   let backendReady = false
@@ -188,7 +238,7 @@ function createTray() {
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show LLM Wiki', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } else createWindow(); } },
     { type: 'separator' },
-    { label: 'Quit', click: () => { isQuitting = true; stopBackend(); app.quit(); } }
+    { label: 'Quit', click: () => { isQuitting = true; stopBackend(); stopVite(); app.quit(); } }
   ]);
   tray.setToolTip('LLM Wiki');
   tray.setContextMenu(contextMenu);
@@ -262,7 +312,7 @@ function setupIPC() {
   // App-level actions invoked from the custom top bar / keyboard shortcuts.
   ipcMain.on('app:reload', () => mainWindow?.webContents.reload());
   ipcMain.on('app:toggle-devtools', () => mainWindow?.webContents.toggleDevTools());
-  ipcMain.on('app:quit', () => { isQuitting = true; stopBackend(); app.quit(); });
+  ipcMain.on('app:quit', () => { isQuitting = true; stopBackend(); stopVite(); app.quit(); });
   ipcMain.on('app:open-external', (_, url) => {
     if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
       shell.openExternal(url);
@@ -316,6 +366,22 @@ if (!gotLock) { app.quit(); } else {
 
     try { createTray(); } catch (e) { console.log('[LLM Wiki] Tray creation skipped:', e.message); }
 
+    // In dev mode, start Vite first so HMR is live by the time the window
+    // loads. In production the static `frontend/dist` is served by the
+    // FastAPI backend itself (see app/main.py spa_fallback), so we skip it.
+    if (DEV_MODE) {
+      startVite();
+      try {
+        await waitForVite(`http://${HOST}:${VITE_PORT}/`);
+        console.log('[LLM Wiki] Vite ready');
+      } catch (err) {
+        console.error(`[LLM Wiki] ${err.message}`);
+        dialog.showErrorBox('Frontend Failed', `The Vite dev server could not be started.\n\n${err.message}\n\nMake sure the frontend dependencies are installed (cd frontend && npm install).`);
+        app.quit();
+        return;
+      }
+    }
+
     startBackend();
 
     // Show offline page while waiting
@@ -326,7 +392,8 @@ if (!gotLock) { app.quit(); } else {
       console.log('[LLM Wiki] Backend ready');
       if (mainWindow) {
         mainWindow._markBackendReady?.();
-        mainWindow.loadURL(`http://${HOST}:${PORT}`);
+        const url = DEV_MODE ? `http://${HOST}:${VITE_PORT}` : `http://${HOST}:${PORT}`;
+        mainWindow.loadURL(url);
       }
     } catch (err) {
       console.error(`[LLM Wiki] ${err.message}`);
