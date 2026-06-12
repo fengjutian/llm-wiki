@@ -113,6 +113,7 @@ let tray = null;
 let isQuitting = false;
 
 function createWindow() {
+  const isMac = process.platform === 'darwin';
   const winOpts = {
     width: windowState.width || 1280,
     height: windowState.height || 860,
@@ -123,6 +124,20 @@ function createWindow() {
     title: 'LLM Wiki',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
     show: false,
+    // Hide the native menu bar; the renderer draws its own themed top bar.
+    // `hiddenInset` keeps macOS traffic-light buttons but hides the rest.
+    titleBarStyle: 'hiddenInset',
+    // Modern Windows 11 look: empty title bar with a configurable overlay area.
+    // The renderer paints a custom top bar; we keep the overlay transparent so
+    // the React header aligns with the OS controls.
+    ...(process.platform === 'win32' && {
+      titleBarOverlay: {
+        color: '#00000000',
+        symbolColor: '#9ca3af',
+        height: 40,
+      },
+    }),
+    ...(isMac && { trafficLightPosition: { x: 14, y: 12 } }),
   };
   mainWindow = new BrowserWindow(winOpts);
 
@@ -189,60 +204,23 @@ function createTray() {
 // ---------------------------------------------------------------------------
 // Native Menu Bar
 // ---------------------------------------------------------------------------
-function buildMenu() {
-  const isMac = process.platform === 'darwin';
-  const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
-    {
-      label: 'File',
-      submenu: [
-        { label: 'New Page', accelerator: 'CmdOrCtrl+N', click: () => mainWindow?.webContents.send('menu:new-page') },
-        { label: 'Open File...', accelerator: 'CmdOrCtrl+O', click: openFileDialog },
-        { type: 'separator' },
-        isMac ? { role: 'close' } : { label: 'Exit', accelerator: 'Alt+F4', click: () => { isQuitting = true; stopBackend(); app.quit(); } }
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
-        { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload', accelerator: 'CmdOrCtrl+R' },
-        { role: 'toggleDevTools', accelerator: 'CmdOrCtrl+Shift+I' },
-        { type: 'separator' },
-        { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'resetZoom' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
-    {
-      label: 'Workbench',
-      submenu: [
-        { label: 'Manage Projects...', click: () => mainWindow?.webContents.send('menu:open-workbench') },
-      ]
-    },
-    {
-      label: 'Help',
-      submenu: [
-        { label: 'About LLM Wiki', click: () => dialog.showMessageBox(mainWindow, { title: 'About', message: 'LLM Wiki', detail: `Version ${app.getVersion()}\n\nLLM-powered structured knowledge base.` }) },
-        { type: 'separator' },
-        { label: 'API Documentation', click: () => shell.openExternal(`http://${HOST}:${PORT}/docs`) }
-      ]
-    }
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+// We intentionally do NOT install a native application menu. The renderer draws
+// its own themed top bar (see frontend/src/components/TopBar.tsx) and
+// handles keyboard shortcuts in-process. The empty menu call below is kept
+// to ensure no default menu appears on platforms that ship one.
+function clearMenu() {
+  Menu.setApplicationMenu(null);
 }
 
 // ---------------------------------------------------------------------------
 // Keyboard shortcuts
 // ---------------------------------------------------------------------------
+// App-level shortcuts are now handled in the renderer (see useKeyboardShortcuts
+// in the frontend) so they participate in the custom top bar's focus model and
+// are subject to the same OS-agnostic behavior. `globalShortcut` is intentionally
+// left unused to avoid hijacking the user's OS-level hotkeys.
 function registerShortcuts() {
-  globalShortcut.register('CommandOrControl+Shift+N', () => mainWindow?.webContents.send('shortcut:new-page'));
+  /* no-op */
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +265,24 @@ function setupIPC() {
   ipcMain.on('window:maximize', () => mainWindow?.[mainWindow.isMaximized() ? 'unmaximize' : 'maximize']());
   ipcMain.on('window:close', () => mainWindow?.close());
 
+  // App-level actions invoked from the custom top bar / keyboard shortcuts.
+  ipcMain.on('app:reload', () => mainWindow?.webContents.reload());
+  ipcMain.on('app:toggle-devtools', () => mainWindow?.webContents.toggleDevTools());
+  ipcMain.on('app:quit', () => { isQuitting = true; stopBackend(); app.quit(); });
+  ipcMain.on('app:open-external', (_, url) => {
+    if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+      shell.openExternal(url);
+    }
+  });
+  ipcMain.handle('app:show-about', () => {
+    if (!mainWindow) return null;
+    return dialog.showMessageBox(mainWindow, {
+      title: 'About',
+      message: 'LLM Wiki',
+      detail: `Version ${app.getVersion()}\n\nLLM-powered structured knowledge base.`,
+    });
+  });
+
   ipcMain.handle('dialog:openFile', () => openFileDialog());
   ipcMain.handle('dialog:saveFile', async (_, content, defaultName) => {
     const result = await dialog.showSaveDialog(mainWindow, { defaultPath: defaultName || 'page.md', filters: [{ name: 'Markdown', extensions: ['md'] }] });
@@ -319,7 +315,7 @@ if (!gotLock) { app.quit(); } else {
   });
 
   app.whenReady().then(async () => {
-    buildMenu();
+    clearMenu();
     registerShortcuts();
     setupAutoUpdater();
     setupIPC();

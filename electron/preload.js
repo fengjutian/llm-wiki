@@ -18,6 +18,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Notifications
   notify: (title, body) => ipcRenderer.send('notify', title, body),
 
+  // App-level actions invoked from the custom top bar / keyboard shortcuts.
+  reload: () => ipcRenderer.send('app:reload'),
+  toggleDevTools: () => ipcRenderer.send('app:toggle-devtools'),
+  quit: () => ipcRenderer.send('app:quit'),
+  openExternal: (url) => ipcRenderer.send('app:open-external', url),
+  showAbout: () => ipcRenderer.invoke('app:show-about'),
+
   // Menu / shortcut events from main process — returns unsubscribe function
   onNewPage: (callback) => {
     const handler = () => callback()
