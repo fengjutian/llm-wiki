@@ -915,3 +915,15 @@ Top issues:
   [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
   [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
 
+## [2026-06-12 09:56] lint | Health check | branch: main
+Score: C | Critical: 2 | Warnings: 42 | Info: 1
+Wiki size: 95 pages, 217 links
+Auto-fix: no
+Issue types: orphan: 36, source_integrity: 4, missing_ref: 2, dead_link: 1, stale: 1, contradiction: 1
+Top issues:
+  [warning] orphan: Page '2025-05-20_1035 Vue Component Refactor Copy Mode Fix' has no incoming links
+  [warning] orphan: Page '2026-01-06 Source: Promotion Copy Code Duplicate Bug' has no incoming links
+  [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
+  [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
+  [warning] orphan: Page '2026-05-15 Source: promotion 与 promotion code 两张表' has no incoming links
+

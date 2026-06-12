@@ -142,13 +142,31 @@ def ingest_source(
       6. Append log.md
       7. Git commit
     """
+    import time
     settings = get_settings()
     result = IngestResult(source_path=source_path, source_hash="", status="skipped", dry_run=dry_run)
+    t0 = time.perf_counter()
 
     # 1. Read source
     content = read_source(source_path)
     if content is None:
         result.errors.append(f"Source not found: {source_path}")
+        result.status = "failed"
+        # Log the failure so users can see it in the journal
+        append_log(
+            LogEntry(
+                timestamp=format_log_timestamp(),
+                operation="ingest",
+                title=source_path,
+                branch=settings.wiki_branch,
+                status="error",
+                duration_seconds=round(time.perf_counter() - t0, 2),
+                details="\n".join([
+                    f"Status: failed",
+                    f"Error: Source file not found",
+                ]),
+            )
+        )
         return result
 
     result.source_hash = file_hash(settings.raw_root / source_path)
@@ -177,6 +195,22 @@ def ingest_source(
         parsed = json.loads(raw_json)
     except Exception as exc:
         result.errors.append(f"LLM call failed: {exc}")
+        elapsed = round(time.perf_counter() - t0, 2)
+        append_log(
+            LogEntry(
+                timestamp=format_log_timestamp(),
+                operation="ingest",
+                title=source_path,
+                branch=settings.wiki_branch,
+                status="error",
+                duration_seconds=elapsed,
+                details="\n".join([
+                    f"Status: failed",
+                    f"Duration: {elapsed}s",
+                    f"Error: LLM call failed — {exc}",
+                ]),
+            )
+        )
         return result
 
     if dry_run:
@@ -237,8 +271,10 @@ def ingest_source(
     src_path_obj = settings.raw_root / source_path
     src_size = src_path_obj.stat().st_size if src_path_obj.exists() else 0
     src_size_str = f"{src_size / 1024:.1f} KB" if src_size >= 1024 else f"{src_size} B"
+    elapsed = round(time.perf_counter() - t0, 2)
     detail_parts = [
         f"Status: {status}",
+        f"Duration: {elapsed}s",
         f"Source hash: {result.source_hash[:12]}",
         f"Source size: {src_size_str}",
         f"New pages ({len(result.new_pages)}): " + (", ".join(result.new_pages) if result.new_pages else "\u2014"),
@@ -252,12 +288,15 @@ def ingest_source(
             else:
                 contra_summaries.append(str(c))
         detail_parts.append(f"Contradictions ({len(result.contradictions)}): " + "; ".join(contra_summaries))
+    log_status = "success" if status in ("pending", "modified") else "info"
     append_log(
         LogEntry(
             timestamp=format_log_timestamp(),
             operation="ingest",
             title=source_path,
             branch=settings.wiki_branch,
+            status=log_status,
+            duration_seconds=elapsed,
             details="\n".join(detail_parts),
         )
     )

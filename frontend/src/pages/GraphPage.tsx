@@ -5,7 +5,10 @@ import { useThemeStore } from '../stores/themeStore'
 import type { GraphData, GraphNode, GraphFilters } from '../api/types'
 import GraphFilterBar, { extractFilterOptions, applyFilters } from '../components/GraphFilterBar'
 
-const EMPTY_FILTERS: GraphFilters = { search: '', pageTypes: [], statuses: [], relationTypes: [] }
+const EMPTY_FILTERS: GraphFilters = {
+  search: '', pageTypes: [], statuses: [], confidences: [], relationTypes: [],
+  inDegreeMin: 0, inDegreeMax: 0, outDegreeMin: 0, outDegreeMax: 0, orphansOnly: false,
+}
 
 export default function GraphPage() {
   const [data, setData] = useState<GraphData | null>(null)
@@ -23,7 +26,10 @@ export default function GraphPage() {
     api.get<GraphData>('/api/graph').then(d => { setData(d); setLoading(false) })
   }, [])
 
-  const filterOptions = useMemo(() => (data ? extractFilterOptions(data) : { pageTypes: [], statuses: [], relationTypes: [] }), [data])
+  const filterOptions = useMemo(
+    () => (data ? extractFilterOptions(data) : { pageTypes: [], statuses: [], confidences: [], relationTypes: [], inDegreeRange: [0, 0] as [number, number], outDegreeRange: [0, 0] as [number, number] }),
+    [data],
+  )
 
   const filtered = useMemo(() => {
     if (!data) return { nodes: [], edges: [] }

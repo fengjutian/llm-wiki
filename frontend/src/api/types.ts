@@ -74,14 +74,23 @@ export interface GraphFilters {
   search: string
   pageTypes: string[]
   statuses: string[]
+  confidences: string[]
   relationTypes: string[]
+  inDegreeMin: number
+  inDegreeMax: number
+  outDegreeMin: number
+  outDegreeMax: number
+  orphansOnly: boolean
 }
 
 /** Distinct filter values derived from current graph data. */
 export interface GraphFilterOptions {
   pageTypes: string[]
   statuses: string[]
+  confidences: string[]
   relationTypes: string[]
+  inDegreeRange: [number, number]
+  outDegreeRange: [number, number]
 }
 
 export interface Branch {
