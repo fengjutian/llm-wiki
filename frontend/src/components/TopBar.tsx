@@ -2,30 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useThemeStore } from '../stores/themeStore'
 
-interface ElectronAPI {
-  platform?: string
-  isElectron?: boolean
-  reload?: () => void
-  toggleDevTools?: () => void
-  quit?: () => void
-  openExternal?: (url: string) => void
-  showAbout?: () => Promise<unknown>
-  openFile?: () => Promise<string | null>
-  saveFile?: (content: string, defaultName?: string) => Promise<string | null>
-  onNewPage?: (cb: () => void) => () => void
-  onOpenWorkbench?: (cb: () => void) => () => void
-  onThemeChange?: (cb: (t: 'dark' | 'light') => void) => () => void
-  minimize?: () => void
-  maximize?: () => void
-  close?: () => void
-}
-
-declare global {
-  interface Window {
-    electronAPI?: ElectronAPI
-  }
-}
-
 type MenuKey = 'file' | 'edit' | 'view' | 'workbench' | 'help'
 
 interface MenuAction {
@@ -206,8 +182,7 @@ export default function TopBar() {
       ref={rootRef}
       // Drag region: the whole bar is draggable so the user can move the window
       // by clicking any empty space. Interactive elements opt out individually.
-      className="relative h-10 flex items-center bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 select-none"
-      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      className="drag-region relative h-10 flex items-center bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 select-none"
     >
       {/* macOS traffic lights are positioned by the OS, but we still want some
           breathing room on the left. On Windows/Linux we add a small inset too. */}
@@ -218,31 +193,28 @@ export default function TopBar() {
           key={key}
           onClick={() => toggleMenu(key)}
           onMouseEnter={() => openMenu && openMenu !== key && setOpenMenu(key)}
-          className={`px-3 h-10 text-sm transition-colors ${
+          className={`no-drag px-3 h-10 text-sm transition-colors ${
             openMenu === key
               ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
               : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
           }`}
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {label}
         </button>
       ))}
 
-      <div className="flex-1 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <div className="drag-region flex-1 h-10" />
 
       {/* Center title — purely decorative, gives the bar some identity. */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 text-xs font-medium text-gray-500 dark:text-gray-400 pointer-events-none"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        className="drag-region absolute left-1/2 -translate-x-1/2 text-xs font-medium text-gray-500 dark:text-gray-400 pointer-events-none"
       >
         📚 LLM Wiki
       </div>
 
       {/* Right cluster: theme toggle + (Win/Linux) window controls */}
       <div
-        className="flex items-center gap-1 pr-2"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        className="no-drag flex items-center gap-1 pr-2"
       >
         <button
           onClick={toggle}
@@ -284,8 +256,8 @@ export default function TopBar() {
       {/* Dropdown panel */}
       {openMenu && (
         <div
-          className="absolute left-0 top-10 min-w-[220px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md shadow-lg py-1 z-50"
-          style={{ WebkitAppRegion: 'no-drag', left: menus.findIndex((m) => m.key === openMenu) * 60 + (isMac ? 80 : 12) } as React.CSSProperties}
+          className="no-drag absolute top-10 min-w-[220px] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-md shadow-lg py-1 z-50"
+          style={{ left: menus.findIndex((m) => m.key === openMenu) * 60 + (isMac ? 80 : 12) }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {menuItems(openMenu).map((item) =>

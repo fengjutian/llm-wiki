@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
-import type { WikiPage } from '../api/types'
+import type { WikiPage, WikiPageListItem } from '../api/types'
 import { useToastStore } from '../stores/toastStore'
 
 const TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
@@ -20,9 +20,10 @@ const STATUS_CONFIG: Record<string, { icon: string; label: string; color: string
 }
 
 export default function WikiBrowserPage() {
-  const [pages, setPages] = useState<WikiPage[]>([])
+  const [pages, setPages] = useState<WikiPageListItem[]>([])
   const [search, setSearch] = useState('')
   const [preview, setPreview] = useState<WikiPage | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const addToast = useToastStore(s => s.add)
 
@@ -34,9 +35,28 @@ export default function WikiBrowserPage() {
   }, [])
 
   const loadPages = () => {
-    api.get<{ pages: WikiPage[] }>('/api/wiki/pages')
+    api.get<{ pages: WikiPageListItem[] }>('/api/wiki/pages')
       .then(d => setPages(d.pages || []))
       .finally(() => setLoading(false))
+  }
+
+  /** Fetch the full page (content + frontmatter) when selecting */
+  const selectPage = async (p: WikiPageListItem) => {
+    setPreviewLoading(true)
+    setEditing(false)
+    try {
+      const full = await api.get<WikiPage>('/api/wiki/pages/' + encodeURIComponent(p.title))
+      setPreview(full)
+    } catch {
+      addToast(`Failed to load: ${p.title}`)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const closePreview = () => {
+    setPreview(null)
+    setEditing(false)
   }
 
   const handleDelete = async (title: string) => {
@@ -44,7 +64,7 @@ export default function WikiBrowserPage() {
     try {
       await api.del('/api/wiki/pages/' + encodeURIComponent(title))
       addToast(`Deleted: ${title}`)
-      if (preview?.title === title) setPreview(null)
+      if (preview?.title === title) closePreview()
       loadPages()
     } catch {
       addToast(`Failed to delete: ${title}`)
@@ -67,6 +87,7 @@ export default function WikiBrowserPage() {
       await api.put('/api/wiki/pages/' + encodeURIComponent(preview.title), { content: editContent })
       addToast(`Saved: ${preview.title}`)
       setEditing(false)
+      // Refresh preview from server
       const updated = await api.get<WikiPage>('/api/wiki/pages/' + encodeURIComponent(preview.title))
       setPreview(updated)
       loadPages()
@@ -110,8 +131,8 @@ export default function WikiBrowserPage() {
     )
   }
 
-  const typeCfg = preview ? TYPE_CONFIG[preview.frontmatter?.page_type] : null
-  const statusCfg = preview ? STATUS_CONFIG[preview.frontmatter?.status] : null
+  const typeCfg = preview?.frontmatter?.page_type ? TYPE_CONFIG[preview.frontmatter.page_type] : null
+  const statusCfg = preview?.frontmatter?.status ? STATUS_CONFIG[preview.frontmatter.status] : null
 
   return (
     <div className="flex gap-0 h-full">
@@ -120,7 +141,9 @@ export default function WikiBrowserPage() {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">
             📚 Wiki Browser
-            <span className="ml-2 text-sm font-normal text-gray-400 dark:text-gray-500">({filtered.length}{filtered.length !== pages.length ? ` / ${pages.length}` : ''})</span>
+            <span className="ml-2 text-sm font-normal text-gray-400 dark:text-gray-500">
+              ({filtered.length}{filtered.length !== pages.length ? ` / ${pages.length}` : ''})
+            </span>
           </h1>
         </div>
 
@@ -152,13 +175,14 @@ export default function WikiBrowserPage() {
             </div>
           ) : (
             filtered.map((p, i) => {
-              const tcfg = TYPE_CONFIG[p.frontmatter?.page_type] || { icon: '❓', label: '?', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }
-              const scfg = STATUS_CONFIG[p.frontmatter?.status] || { icon: '?', label: p.frontmatter?.status || '?', color: 'text-gray-400' }
+              // List items use flat fields: p.page_type, p.status (NOT p.frontmatter.xxx)
+              const tcfg = TYPE_CONFIG[p.page_type] || { icon: '❓', label: p.page_type || '?', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' }
+              const scfg = STATUS_CONFIG[p.status] || { icon: '?', label: p.status || '?', color: 'text-gray-400' }
               const isActive = preview?.title === p.title
               return (
                 <button
                   key={p.title}
-                  onClick={() => { setPreview(p); setEditing(false) }}
+                  onClick={() => selectPage(p)}
                   className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 text-sm group
                     ${isActive
                       ? 'bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-800 shadow-sm'
@@ -175,14 +199,14 @@ export default function WikiBrowserPage() {
                   {/* Title */}
                   <span className="flex-1 truncate font-medium text-gray-800 dark:text-gray-200">{p.title}</span>
 
-                  {/* Summary preview on hover */}
-                  {p.frontmatter?.summary && (
-                    <span className="hidden group-hover:hidden truncate max-w-[160px] text-xs text-gray-400 dark:text-gray-500 italic">
-                      {p.frontmatter.summary}
+                  {/* Summary snippet */}
+                  {p.summary && (
+                    <span className="hidden xl:block truncate max-w-[180px] text-xs text-gray-400 dark:text-gray-500 italic">
+                      {p.summary}
                     </span>
                   )}
 
-                  {/* Status dot */}
+                  {/* Status */}
                   <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-medium ${scfg.color}`}>
                     <span>{scfg.icon}</span>
                     <span className="hidden md:inline">{scfg.label}</span>
@@ -215,65 +239,80 @@ export default function WikiBrowserPage() {
               </div>
             </div>
             <button
-              onClick={() => { setPreview(null); setEditing(false) }}
+              onClick={closePreview}
               className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-lg"
             >
               &times;
             </button>
           </div>
 
-          {/* Summary */}
-          {preview.frontmatter?.summary && !editing && (
-            <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 mb-4">
-              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Summary</p>
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{preview.frontmatter.summary}</p>
+          {/* Loading indicator for preview */}
+          {previewLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-8 h-8 border-2 border-cyan-600 border-t-transparent rounded-full animate-spin" />
             </div>
-          )}
+          ) : (
+            <>
+              {/* Summary */}
+              {preview.frontmatter?.summary && !editing && (
+                <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 mb-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Summary</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{preview.frontmatter.summary}</p>
+                </div>
+              )}
 
-          {/* Action buttons */}
-          <div className="flex gap-2 mb-4">
-            {!editing ? (
-              <>
-                <button onClick={() => startEdit(preview)} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium transition-colors">
-                  ✏️ <span>Edit</span>
-                </button>
-                <button onClick={() => handleDelete(preview.title)} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-gray-100 hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-950/30 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors">
-                  🗑 <span>Delete</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={saveEdit} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-colors shadow-sm">
-                  💾 <span>Save</span>
-                </button>
-                <button onClick={cancelEdit} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium transition-colors">
-                  <span>Cancel</span>
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Content area */}
-          <div className="flex-1 overflow-hidden">
-            {editing ? (
-              <textarea
-                value={editContent}
-                onChange={e => setEditContent(e.target.value)}
-                className="w-full h-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-sm text-gray-800 dark:text-gray-200 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
-                spellCheck={false}
-                placeholder="输入页面内容..."
-              />
-            ) : (
-              <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 h-full overflow-y-auto">
-                <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono leading-relaxed">{preview.content?.slice(0, 5000)}</pre>
-                {(preview.content?.length || 0) > 5000 && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    内容已截断（显示前 5000 字符，共 {preview.content!.length.toLocaleString()} 字符）
-                  </p>
+              {/* Action buttons */}
+              <div className="flex gap-2 mb-4">
+                {!editing ? (
+                  <>
+                    <button onClick={() => startEdit(preview)} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium transition-colors">
+                      ✏️ <span>Edit</span>
+                    </button>
+                    <button onClick={() => handleDelete(preview.title)} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-gray-100 hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-950/30 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 font-medium transition-colors">
+                      🗑 <span>Delete</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={saveEdit} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-colors shadow-sm">
+                      💾 <span>Save</span>
+                    </button>
+                    <button onClick={cancelEdit} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium transition-colors">
+                      <span>Cancel</span>
+                    </button>
+                  </>
                 )}
               </div>
-            )}
-          </div>
+
+              {/* Content area */}
+              <div className="flex-1 overflow-hidden">
+                {editing ? (
+                  <textarea
+                    value={editContent}
+                    onChange={e => setEditContent(e.target.value)}
+                    className="w-full h-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-sm text-gray-800 dark:text-gray-200 font-mono resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+                    spellCheck={false}
+                    placeholder="输入页面内容..."
+                  />
+                ) : (
+                  <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 h-full overflow-y-auto">
+                    {preview.content ? (
+                      <>
+                        <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono leading-relaxed">{preview.content.slice(0, 5000)}</pre>
+                        {preview.content.length > 5000 && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            内容已截断（显示前 5,000 字符，共 {preview.content.length.toLocaleString()} 字符）
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-400 dark:text-gray-500 text-sm italic">（无内容）</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

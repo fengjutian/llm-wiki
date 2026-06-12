@@ -1,19 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-interface ElectronAPI {
-  reload?: () => void
-  toggleDevTools?: () => void
-  openFile?: () => Promise<string | null>
-  onNewPage?: (cb: () => void) => () => void
-}
-
-declare global {
-  interface Window {
-    electronAPI?: ElectronAPI
-  }
-}
-
 const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
 
 /**

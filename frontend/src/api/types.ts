@@ -1,3 +1,13 @@
+/** Flat list item from GET /api/wiki/pages (no content, no nested frontmatter) */
+export interface WikiPageListItem {
+  title: string
+  page_type: string
+  status: string
+  summary?: string
+  updated_at?: string
+}
+
+/** Full page from GET /api/wiki/pages/{name} (content + nested frontmatter) */
 export interface WikiPage {
   title: string
   content: string
