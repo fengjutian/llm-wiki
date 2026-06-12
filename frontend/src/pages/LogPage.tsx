@@ -17,12 +17,12 @@ export default function LogPage() {
     <div>
       <h1 className="text-2xl font-bold mb-4">Operation Log</h1>
       <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter..."
-        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm mb-4 focus:outline-none focus:border-cyan-500"/>
+        className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm mb-4 focus:outline-none focus:border-cyan-500"/>
       <div className="space-y-1">
         {filtered.slice(0, 100).map((e,i) => (
-          <div key={i} className="bg-gray-900 rounded-lg px-4 py-3 text-sm flex items-start gap-4">
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm flex items-start gap-4">
             <span className="text-xs text-gray-500 w-36 shrink-0">{e.timestamp}</span>
-            <span className="font-semibold text-cyan-400 w-32 shrink-0">{e.operation}</span>
+            <span className="font-semibold text-cyan-600 dark:text-cyan-400 w-32 shrink-0">{e.operation}</span>
             <span className="flex-1 truncate">{e.title}</span>
             <span className="text-xs text-gray-500">{e.branch}</span>
           </div>

@@ -32,9 +32,9 @@ export default function ConfigPage() {
       <h1 className="text-2xl font-bold mb-6">Configuration</h1>
       {Object.entries(config).map(([k,v]) => (
         <div key={k} className="mb-3">
-          <label className="block text-xs text-gray-400 mb-1">{k}</label>
+          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{k}</label>
           <input value={v||''} onChange={e => setConfig(p => ({...p,[k]:e.target.value}))}
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"/>
+            className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"/>
         </div>
       ))}
       <div className="flex gap-3 mt-6">
@@ -43,11 +43,11 @@ export default function ConfigPage() {
           {saving ? 'Saving...' : 'Save'}
         </button>
         <button onClick={testConn} disabled={testing}
-          className="px-6 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-lg text-sm">
+          className="px-6 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 disabled:opacity-50 rounded-lg text-sm">
           {testing ? 'Testing...' : 'Test Connection'}
         </button>
       </div>
-      {testResult && <p className={`mt-3 text-sm ${testResult.startsWith('OK')?'text-green-400':'text-red-400'}`}>{testResult}</p>}
+      {testResult && <p className={`mt-3 text-sm ${testResult.startsWith('OK')?'text-green-500 dark:text-green-400':'text-red-500 dark:text-red-400'}`}>{testResult}</p>}
     </div>
   )
 }

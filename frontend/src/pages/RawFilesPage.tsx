@@ -202,7 +202,7 @@ export default function RawFilesPage() {
         {loading ? <p className="text-gray-500">Loading...</p> : rawFiles.length === 0 ? (
           <p className="text-gray-500 py-8 text-center">暂无文件，请通过 Ingest 页面上传源文档。</p>
         ) : (
-          <div className="bg-gray-900 rounded-xl overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-gray-500 text-xs uppercase">
                 <th className="p-3 w-8"></th>
@@ -215,28 +215,28 @@ export default function RawFilesPage() {
               </tr></thead>
               <tbody>
                 {rawFiles.map(f => (
-                  <tr key={f.path} className="border-t border-gray-800 hover:bg-gray-800/50">
+                  <tr key={f.path} className="border-t border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="p-3"><input type="checkbox" checked={selected.has(f.path)} onChange={() => toggle(f.path)}/></td>
-                    <td className="p-3 font-medium text-cyan-400">{f.path}</td>
-                    <td className="p-3 text-gray-400">{formatSize(f.size)}</td>
+                    <td className="p-3 font-medium text-cyan-600 dark:text-cyan-400">{f.path}</td>
+                    <td className="p-3 text-gray-600 dark:text-gray-400">{formatSize(f.size)}</td>
                     <td className="p-3 text-gray-500 font-mono text-xs">{f.hash}</td>
                     <td className="p-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                        f.status === 'ingested' ? 'bg-green-900/50 text-green-400' :
-                        f.status === 'modified' ? 'bg-yellow-900/50 text-yellow-400' :
-                        'bg-blue-900/50 text-blue-400'
+                        f.status === 'ingested' ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400' :
+                        f.status === 'modified' ? 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400' :
+                        'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400'
                       }`}>{statusLabels[f.status] || f.status}</span>
                     </td>
-                    <td className="p-3 text-gray-400 text-xs">
+                    <td className="p-3 text-gray-600 dark:text-gray-400 text-xs">
                       {f.wiki_pages.length > 0
-                        ? f.wiki_pages.map(p => <span key={p} className="inline-block mr-1 text-cyan-300">[[{p}]]</span>)
-                        : <span className="text-gray-600">—</span>}
+                        ? f.wiki_pages.map(p => <span key={p} className="inline-block mr-1 text-cyan-600 dark:text-cyan-300">[[{p}]]</span>)
+                        : <span className="text-gray-500 dark:text-gray-600">—</span>}
                     </td>
                     <td className="p-3 text-right">
                       <div className="flex gap-1 justify-end">
-                        <button onClick={() => viewRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="查看">👁</button>
-                        <button onClick={() => editRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="编辑">✏️</button>
-                        <button onClick={() => deleteRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-red-800 text-gray-300 hover:text-red-300" title="删除">🗑</button>
+                        <button onClick={() => viewRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" title="查看">👁</button>
+                        <button onClick={() => editRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" title="编辑">✏️</button>
+                        <button onClick={() => deleteRaw(f.path)} className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-red-100 dark:bg-gray-700 dark:hover:bg-red-800 text-gray-700 dark:text-gray-300 dark:hover:text-red-300" title="删除">🗑</button>
                       </div>
                     </td>
                   </tr>
@@ -251,7 +251,7 @@ export default function RawFilesPage() {
       {wikiFiles.length > 0 && (
         <div>
           <h2 className="text-xl font-bold mb-4">📝 已生成 Wiki 页面 ({wikiFiles.length})</h2>
-          <div className="bg-gray-900 rounded-xl overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-gray-500 text-xs uppercase">
                 <th className="p-3">Title</th>
@@ -263,23 +263,23 @@ export default function RawFilesPage() {
               </tr></thead>
               <tbody>
                 {wikiFiles.map(w => (
-                  <tr key={w.title} className="border-t border-gray-800 hover:bg-gray-800/50">
-                    <td className="p-3 font-medium text-purple-400">{w.title}</td>
-                    <td className="p-3 text-gray-400">{w.page_type}</td>
+                  <tr key={w.title} className="border-t border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="p-3 font-medium text-purple-600 dark:text-purple-400">{w.title}</td>
+                    <td className="p-3 text-gray-600 dark:text-gray-400">{w.page_type}</td>
                     <td className="p-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                        w.status === 'active' ? 'bg-green-900/50 text-green-400' :
-                        w.status === 'draft' ? 'bg-gray-700/50 text-gray-400' :
-                        'bg-yellow-900/50 text-yellow-400'
+                        w.status === 'active' ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400' :
+                        w.status === 'draft' ? 'bg-gray-200 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400' :
+                        'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400'
                       }`}>{w.status}</span>
                     </td>
-                    <td className="p-3 text-gray-400">{formatSize(w.size)}</td>
+                    <td className="p-3 text-gray-600 dark:text-gray-400">{formatSize(w.size)}</td>
                     <td className="p-3 text-gray-500 text-xs truncate max-w-xs">{w.summary}</td>
                     <td className="p-3 text-right">
                       <div className="flex gap-1 justify-end">
-                        <button onClick={() => viewWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="查看">👁</button>
-                        <button onClick={() => editWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 text-gray-300" title="编辑">✏️</button>
-                        <button onClick={() => deleteWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-red-800 text-gray-300 hover:text-red-300" title="删除">🗑</button>
+                        <button onClick={() => viewWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" title="查看">👁</button>
+                        <button onClick={() => editWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300" title="编辑">✏️</button>
+                        <button onClick={() => deleteWiki(w.title)} className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-red-100 dark:bg-gray-700 dark:hover:bg-red-800 text-gray-700 dark:text-gray-300 dark:hover:text-red-300" title="删除">🗑</button>
                       </div>
                     </td>
                   </tr>
@@ -293,32 +293,32 @@ export default function RawFilesPage() {
       {/* View / Edit Modal */}
       {modal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={closeModal}>
-          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col m-4"
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col m-4"
                onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800 shrink-0">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
               <h3 className="font-semibold text-sm">
                 {isViewing ? '👁 ' : '✏️ '}
                 {modal === 'viewRaw' || modal === 'editRaw' ? 'Raw: ' : 'Wiki: '}
-                <span className="text-cyan-400">{modalTarget}</span>
+                <span className="text-cyan-600 dark:text-cyan-400">{modalTarget}</span>
               </h3>
-              <button onClick={closeModal} className="text-gray-500 hover:text-gray-300 text-lg leading-none">&times;</button>
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-lg leading-none">&times;</button>
             </div>
             <div className="flex-1 overflow-hidden p-5">
               {modalLoading ? (
                 <p className="text-gray-500">Loading...</p>
               ) : isViewing ? (
-                <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono h-full max-h-[65vh] overflow-y-auto">{modalContent}</pre>
+                <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono h-full max-h-[65vh] overflow-y-auto">{modalContent}</pre>
               ) : (
                 <textarea
                   value={modalContent}
                   onChange={e => setModalContent(e.target.value)}
-                  className="w-full h-full min-h-[400px] max-h-[65vh] bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-mono resize-none focus:outline-none focus:border-cyan-500"
+                  className="w-full h-full min-h-[400px] max-h-[65vh] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-sm text-gray-800 dark:text-gray-200 font-mono resize-none focus:outline-none focus:border-cyan-500"
                   spellCheck={false}
                 />
               )}
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-800 shrink-0">
-              <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300">
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 dark:border-gray-800 shrink-0">
+              <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">
                 关闭
               </button>
               {isEditing && (

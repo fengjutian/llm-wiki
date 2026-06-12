@@ -63,7 +63,7 @@ export default function PageDetail() {
   }
 
   if (loading) return <p className="text-gray-500">Loading...</p>
-  if (error) return <p className="text-red-400">{error}</p>
+  if (error) return <p className="text-red-500 dark:text-red-400">{error}</p>
   if (!page) return <p className="text-gray-500">Page not found</p>
 
   return (
@@ -73,13 +73,13 @@ export default function PageDetail() {
         <div className="flex gap-2 shrink-0 ml-4">
           {!editing ? (
             <>
-              <button onClick={startEdit} className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300">Edit</button>
-              <button onClick={handleDelete} className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-red-800 text-gray-300 hover:text-red-300">Delete</button>
+              <button onClick={startEdit} className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">Edit</button>
+              <button onClick={handleDelete} className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 hover:bg-red-100 dark:bg-gray-700 dark:hover:bg-red-800 text-gray-700 dark:text-gray-300 dark:hover:text-red-300">Delete</button>
             </>
           ) : (
             <>
               <button onClick={saveEdit} className="px-3 py-1.5 text-xs rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold">Save</button>
-              <button onClick={cancelEdit} className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300">Cancel</button>
+              <button onClick={cancelEdit} className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">Cancel</button>
             </>
           )}
         </div>
@@ -90,17 +90,17 @@ export default function PageDetail() {
         {page.frontmatter?.confidence && <span>confidence: {page.frontmatter.confidence}</span>}
       </div>
       {page.frontmatter?.summary && !editing && (
-        <div className="bg-cyan-500/5 border-l-4 border-cyan-500 px-4 py-3 mb-6 rounded-r-lg text-sm text-gray-400">{page.frontmatter.summary}</div>
+        <div className="bg-cyan-500/5 border-l-4 border-cyan-500 px-4 py-3 mb-6 rounded-r-lg text-sm text-gray-700 dark:text-gray-400">{page.frontmatter.summary}</div>
       )}
       {editing ? (
         <textarea
           value={editContent}
           onChange={e => setEditContent(e.target.value)}
-          className="w-full h-[60vh] bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-mono resize-none focus:outline-none focus:border-cyan-500"
+          className="w-full h-[60vh] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-sm text-gray-800 dark:text-gray-200 font-mono resize-none focus:outline-none focus:border-cyan-500"
           spellCheck={false}
         />
       ) : (
-        <div className="prose prose-invert prose-sm max-w-none">
+        <div className="prose prose-sm dark:prose-invert max-w-none">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{page.content}</ReactMarkdown>
         </div>
       )}

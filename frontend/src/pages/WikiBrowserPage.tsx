@@ -69,12 +69,12 @@ export default function WikiBrowserPage() {
       <div className="flex-1">
         <h1 className="text-2xl font-bold mb-4">Wiki Browser</h1>
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search pages..." className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm mb-4 focus:outline-none focus:border-cyan-500"/>
+          placeholder="Search pages..." className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm mb-4 focus:outline-none focus:border-cyan-500"/>
         {loading ? <p className="text-gray-500">Loading...</p> : (
           <div className="space-y-1">
             {filtered.map(p => (
               <button key={p.title} onClick={() => { setPreview(p); setEditing(false) }}
-                className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm">
+                className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm">
                 <span className="text-xs w-5 text-center">{TYPE_ICONS[p.frontmatter?.page_type]||'?'}</span>
                 <span className="flex-1 truncate font-medium">{p.title}</span>
                 <span className={STATUS_COLORS[p.frontmatter?.status]||'text-gray-500'}>{p.frontmatter?.status||'?'}</span>
@@ -85,10 +85,10 @@ export default function WikiBrowserPage() {
         )}
       </div>
       {preview && (
-        <div className="w-[420px] shrink-0 border-l border-gray-800 pl-6 animate-drawer-in">
+        <div className="w-[420px] shrink-0 border-l border-gray-200 dark:border-gray-800 pl-6 animate-drawer-in">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold">{preview.title}</h2>
-            <button onClick={() => { setPreview(null); setEditing(false) }} className="text-gray-500 hover:text-gray-300 text-lg">&times;</button>
+            <button onClick={() => { setPreview(null); setEditing(false) }} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-lg">&times;</button>
           </div>
           <div className="text-xs text-gray-500 mb-3">{preview.frontmatter?.page_type} | {preview.frontmatter?.status}</div>
 
@@ -96,28 +96,28 @@ export default function WikiBrowserPage() {
           <div className="flex gap-2 mb-4">
             {!editing ? (
               <>
-                <button onClick={() => startEdit(preview)} className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300">✏️ Edit</button>
-                <button onClick={() => handleDelete(preview.title)} className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-red-800 text-gray-300 hover:text-red-300">🗑 Delete</button>
+                <button onClick={() => startEdit(preview)} className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">✏️ Edit</button>
+                <button onClick={() => handleDelete(preview.title)} className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 hover:bg-red-100 dark:bg-gray-700 dark:hover:bg-red-800 text-gray-700 dark:text-gray-300 dark:hover:text-red-300">🗑 Delete</button>
               </>
             ) : (
               <>
                 <button onClick={saveEdit} className="px-3 py-1.5 text-xs rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold">💾 Save</button>
-                <button onClick={cancelEdit} className="px-3 py-1.5 text-xs rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300">Cancel</button>
+                <button onClick={cancelEdit} className="px-3 py-1.5 text-xs rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">Cancel</button>
               </>
             )}
           </div>
 
-          {preview.frontmatter?.summary && !editing && <p className="text-sm text-gray-400 mb-3 italic">{preview.frontmatter.summary}</p>}
+          {preview.frontmatter?.summary && !editing && <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 italic">{preview.frontmatter.summary}</p>}
 
           {editing ? (
             <textarea
               value={editContent}
               onChange={e => setEditContent(e.target.value)}
-              className="w-full h-[55vh] bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-mono resize-none focus:outline-none focus:border-cyan-500"
+              className="w-full h-[55vh] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-sm text-gray-800 dark:text-gray-200 font-mono resize-none focus:outline-none focus:border-cyan-500"
               spellCheck={false}
             />
           ) : (
-            <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono max-h-[70vh] overflow-y-auto">{preview.content?.slice(0,5000)}</pre>
+            <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono max-h-[70vh] overflow-y-auto">{preview.content?.slice(0,5000)}</pre>
           )}
         </div>
       )}

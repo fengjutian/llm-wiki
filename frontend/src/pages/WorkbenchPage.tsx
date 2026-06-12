@@ -45,11 +45,11 @@ export default function WorkbenchPage() {
     <div className="max-w-lg">
       <h1 className="text-2xl font-bold mb-6">管理工作目录</h1>
 
-      <div className="bg-gray-900 rounded-xl p-4 mb-6 space-y-2">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 mb-6 space-y-2">
         <input value={name} onChange={e => setName(e.target.value)} placeholder="项目名称"
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"/>
+          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:border-cyan-500"/>
         <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="描述（可选）"
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"/>
+          className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:border-cyan-500"/>
         <button onClick={create}
           className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-semibold disabled:opacity-50"
           disabled={!name.trim()}>
@@ -64,13 +64,13 @@ export default function WorkbenchPage() {
       ) : (
         <div className="space-y-2">
           {projects.map(p => (
-            <div key={p.name} className={`bg-gray-900 rounded-xl p-4 flex items-center justify-between ${
-              p.name === active ? 'border border-cyan-500/50' : ''
+            <div key={p.name} className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-center justify-between ${
+              p.name === active ? 'border-cyan-500/50' : ''
             }`}>
               <div>
                 <div className="font-semibold">
                   {p.name}
-                  {p.name === active && <span className="text-xs text-cyan-400 ml-1">● 当前</span>}
+                  {p.name === active && <span className="text-xs text-cyan-600 dark:text-cyan-400 ml-1">● 当前</span>}
                 </div>
                 <div className="text-xs text-gray-500">
                   {p.description && <span>{p.description} — </span>}
@@ -80,10 +80,10 @@ export default function WorkbenchPage() {
               <div className="flex gap-2">
                 {p.name !== active && (
                   <button onClick={() => handleActivate(p.name)}
-                    className="text-xs text-cyan-400 hover:underline">切换</button>
+                    className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline">切换</button>
                 )}
                 <button onClick={() => del(p.name)}
-                  className="text-xs text-red-400 hover:underline">删除</button>
+                  className="text-xs text-red-500 dark:text-red-400 hover:underline">删除</button>
               </div>
             </div>
           ))}

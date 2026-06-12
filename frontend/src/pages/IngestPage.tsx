@@ -69,7 +69,7 @@ export default function IngestPage() {
       {/* Drop Zone */}
       <div
         className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer mb-6 ${
-          dragOver ? 'border-cyan-400 bg-cyan-500/10' : 'border-gray-700 hover:border-gray-500'
+          dragOver ? 'border-cyan-500 bg-cyan-500/10' : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500'
         }`}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
@@ -77,7 +77,7 @@ export default function IngestPage() {
         onClick={() => fileInputRef.current?.click()}
       >
         <span className="text-4xl block mb-2">📁</span>
-        <p className="text-gray-400">Drop .md / .txt files here, or click to browse</p>
+        <p className="text-gray-600 dark:text-gray-400">Drop .md / .txt files here, or click to browse</p>
         <input
           ref={fileInputRef}
           type="file"
@@ -90,19 +90,19 @@ export default function IngestPage() {
 
       {/* Upload Queue */}
       {queue.length > 0 && (
-        <div className="bg-gray-900 rounded-xl p-4 mb-6">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase mb-3">Upload Queue ({queue.length})</h2>
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-4 mb-6 border border-gray-200 dark:border-gray-800">
+          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">Upload Queue ({queue.length})</h2>
           <div className="space-y-2">
             {queue.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 bg-gray-800 rounded-lg px-3 py-2 text-sm">
+              <div key={item.id} className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm">
                 <span className="flex-1 truncate font-medium">{item.file.name}</span>
                 <span className="text-xs text-gray-500">{(item.file.size / 1024).toFixed(1)} KB</span>
                 <span className={`text-xs font-semibold ${
-                  item.status === 'done' ? 'text-green-400' : item.status === 'error' ? 'text-red-400' : item.status === 'uploading' ? 'text-cyan-400' : 'text-gray-500'
+                  item.status === 'done' ? 'text-green-500 dark:text-green-400' : item.status === 'error' ? 'text-red-500 dark:text-red-400' : item.status === 'uploading' ? 'text-cyan-500 dark:text-cyan-400' : 'text-gray-500'
                 }`}>
                   {item.status === 'done' ? 'Done' : item.status === 'error' ? 'Error' : item.status === 'uploading' ? 'Uploading...' : 'Pending'}
                 </span>
-                {item.error && <span className="text-xs text-red-400 truncate max-w-[120px]" title={item.error}>{item.error}</span>}
+                {item.error && <span className="text-xs text-red-500 dark:text-red-400 truncate max-w-[120px]" title={item.error}>{item.error}</span>}
               </div>
             ))}
           </div>
@@ -116,7 +116,7 @@ export default function IngestPage() {
         </div>
       )}
 
-      {result && <pre className="bg-gray-900 rounded-xl p-4 text-xs text-gray-300 overflow-x-auto">{result}</pre>}
+      {result && <pre className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 text-xs text-gray-700 dark:text-gray-300 overflow-x-auto">{result}</pre>}
     </div>
   )
 }

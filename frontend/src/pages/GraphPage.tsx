@@ -40,12 +40,12 @@ export default function GraphPage() {
       <div className="flex items-center gap-4 mb-4 shrink-0">
         <h1 className="text-2xl font-bold">Knowledge Graph</h1>
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Filter nodes..." className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-cyan-500 w-48"/>
+          placeholder="Filter nodes..." className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-cyan-500 w-48"/>
         {data && <span className="text-xs text-gray-500">{data.nodes.length} nodes, {data.edges.length} edges</span>}
-        <button onClick={() => graphRef.current?.zoomToFit(400)} className="text-xs text-gray-500 hover:text-cyan-400">Fit view</button>
+        <button onClick={() => graphRef.current?.zoomToFit(400)} className="text-xs text-gray-500 hover:text-cyan-600 dark:hover:text-cyan-400">Fit view</button>
       </div>
       {loading ? <p className="text-gray-500">Loading graph...</p> : data ? (
-        <div ref={containerRef} className="flex-1 bg-gray-900 rounded-xl overflow-hidden relative">
+        <div ref={containerRef} className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden relative">
           <ForceGraph2D
             ref={graphRef}
             graphData={{
@@ -76,12 +76,12 @@ export default function GraphPage() {
             height={dims.h}
           />
           {selectedNode && (
-            <div className="absolute top-4 right-4 bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-xl max-w-xs">
+            <div className="absolute top-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-xl max-w-xs">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-bold text-sm">{selectedNode.title}</h3>
-                <button onClick={() => setSelectedNode(null)} className="text-gray-500 hover:text-gray-300">&times;</button>
+                <button onClick={() => setSelectedNode(null)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">&times;</button>
               </div>
-              <div className="text-xs text-gray-400 space-y-1">
+              <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                 <div>Type: {selectedNode.page_type}</div>
                 <div>Status: {selectedNode.status}</div>
                 <div>In-links: {selectedNode.in_degree} | Out-links: {selectedNode.out_degree}</div>

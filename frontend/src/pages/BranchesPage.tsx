@@ -30,14 +30,14 @@ export default function BranchesPage() {
       <h1 className="text-2xl font-bold mb-6">Branches</h1>
       <div className="flex gap-2 mb-6">
         <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New branch name"
-          className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"/>
+          className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500"/>
         <button onClick={create} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-semibold">Create</button>
       </div>
       <div className="space-y-1">
         {branches.map(b => (
           <div key={b.name} onClick={() => checkout(b.name)}
             className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
-              b.is_active ? 'bg-cyan-500/10 text-cyan-400 font-semibold' : 'hover:bg-gray-800 text-gray-300'
+              b.is_active ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
             }`}>
             <span>{b.name}</span>
             {b.is_active && <span className="text-xs bg-cyan-500/20 px-2 py-0.5 rounded">active</span>}

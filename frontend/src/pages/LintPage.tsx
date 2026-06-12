@@ -20,7 +20,7 @@ export default function LintPage() {
     } catch { setError('Failed to start lint'); setRunning(false) }
   }
 
-  const severityColor = (s: string) => s === 'critical' ? 'text-red-400' : s === 'warning' ? 'text-yellow-400' : 'text-blue-400'
+  const severityColor = (s: string) => s === 'critical' ? 'text-red-500 dark:text-red-400' : s === 'warning' ? 'text-yellow-600 dark:text-yellow-400' : 'text-blue-500 dark:text-blue-400'
 
   return (
     <div>
@@ -31,23 +31,23 @@ export default function LintPage() {
           {running ? 'Running...' : 'Run Lint'}
         </button>
       </div>
-      {error && <p className="text-red-400 mb-4">{error}</p>}
+      {error && <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>}
       {report && (
         <div>
-          <div className="bg-gray-900 rounded-xl p-6 mb-4 flex items-center gap-4">
-            <span className="text-4xl font-bold text-cyan-400">{report.health_score}</span>
-            <div><div className="font-semibold">Health Score</div><div className="text-sm text-gray-400">{report.summary}</div></div>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-4 flex items-center gap-4">
+            <span className="text-4xl font-bold text-cyan-600 dark:text-cyan-400">{report.health_score}</span>
+            <div><div className="font-semibold">Health Score</div><div className="text-sm text-gray-600 dark:text-gray-400">{report.summary}</div></div>
           </div>
           <div className="space-y-2">
             {report.issues?.map((i: LintIssue, idx: number) => (
-              <div key={idx} className="bg-gray-900 rounded-xl p-4">
+              <div key={idx} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-xs font-semibold uppercase ${severityColor(i.severity)}`}>{i.severity}</span>
                   <span className="text-xs text-gray-500">{i.type}</span>
                 </div>
                 <p className="text-sm">{i.description}</p>
                 {i.affected_pages?.length > 0 && <p className="text-xs text-gray-500 mt-1">Pages: {i.affected_pages.join(', ')}</p>}
-                {i.suggestion && <p className="text-xs text-cyan-400 mt-1">Suggestion: {i.suggestion}</p>}
+                {i.suggestion && <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-1">Suggestion: {i.suggestion}</p>}
               </div>
             ))}
           </div>
