@@ -51,9 +51,10 @@ let viteProcess = null;
 
 function startVite() {
   const projectRoot = path.join(__dirname, '..');
+  const frontendDir = path.join(projectRoot, 'frontend');
   const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   console.log(`[LLM Wiki] Starting Vite dev server (npm run --prefix frontend dev)`);
-  viteProcess = spawn(npmCmd, ['run', 'dev'], {
+  viteProcess = spawn(npmCmd, ['run', '--prefix', frontendDir, 'dev'], {
     cwd: projectRoot,
     shell: true,
     env: { ...process.env, BROWSER: 'none' },
@@ -280,7 +281,11 @@ function showNotification(title, body) {
 // Auto-updater (foundation — requires electron-updater pkg)
 // ---------------------------------------------------------------------------
 function setupAutoUpdater() {
-  // In production, uncomment and add electron-updater dependency:
+  // Skip in dev mode — electron-updater is a production-only dependency.
+  if (DEV_MODE) {
+    console.log('[LLM Wiki] Auto-updater skipped (dev mode)');
+    return;
+  }
   try {
     const { autoUpdater } = require('electron-updater')
     if (!DEV_MODE) {
@@ -409,15 +414,16 @@ if (!gotLock) { app.quit(); } else {
   });
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') { stopBackend(); app.quit(); }
+    if (process.platform !== 'darwin') { stopBackend(); stopVite(); app.quit(); }
   });
 
   app.on('before-quit', () => {
     isQuitting = true;
     globalShortcut.unregisterAll();
     stopBackend();
+    stopVite();
   });
 
-  process.on('SIGINT', () => { stopBackend(); app.quit(); });
-  process.on('SIGTERM', () => { stopBackend(); app.quit(); });
+  process.on('SIGINT', () => { stopBackend(); stopVite(); app.quit(); });
+  process.on('SIGTERM', () => { stopBackend(); stopVite(); app.quit(); });
 }
