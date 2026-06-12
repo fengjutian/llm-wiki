@@ -708,86 +708,89 @@ app.include_router(workbench_router)
 
 
 # ============================================================================
-# Frontend pages
+# Frontend pages (Jinja2 fallback — only when React dist is not built)
 # ============================================================================
+FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 
-@app.get("/", response_class=HTMLResponse)
-async def page_home():
-    return _render("index.html")
+if not FRONTEND_DIST.exists():
 
-
-@app.get("/wikifile", response_class=HTMLResponse)
-async def page_wikifile(request: Request):
-    return _render("index.html")
+    @app.get("/", response_class=HTMLResponse)
+    async def page_home():
+        return _render("index.html")
 
 
-@app.get("/page/{name:path}", response_class=HTMLResponse)
-async def page_view(name: str):
-    from core.wiki_io import read_page as io_read_page
-    page = io_read_page(name)
-    if not page:
-        return HTMLResponse(f"<h1>404</h1><p>Page '{name}' not found.</p>", status_code=404)
-    try:
-        tmpl = templates.get_template("page.html")
-        html = tmpl.render(page=page)
-        return HTMLResponse(html)
-    except Exception as e:
-        logger.warning("Template 'page.html' failed: %s", e)
-        return HTMLResponse(f"<h1>{page.title}</h1><pre>{page.content[:5000]}</pre>")
+    @app.get("/wikifile", response_class=HTMLResponse)
+    async def page_wikifile(request: Request):
+        return _render("index.html")
 
 
-@app.get("/workbench", response_class=HTMLResponse)
-async def page_workbench(request: Request):
-    return _render("workbench.html")
+    @app.get("/page/{name:path}", response_class=HTMLResponse)
+    async def page_view(name: str):
+        from core.wiki_io import read_page as io_read_page
+        page = io_read_page(name)
+        if not page:
+            return HTMLResponse(f"<h1>404</h1><p>Page '{name}' not found.</p>", status_code=404)
+        try:
+            tmpl = templates.get_template("page.html")
+            html = tmpl.render(page=page)
+            return HTMLResponse(html)
+        except Exception as e:
+            logger.warning("Template 'page.html' failed: %s", e)
+            return HTMLResponse(f"<h1>{page.title}</h1><pre>{page.content[:5000]}</pre>")
 
 
-@app.get("/graph", response_class=HTMLResponse)
-async def page_graph(request: Request):
-    return _render("graph.html")
+    @app.get("/workbench", response_class=HTMLResponse)
+    async def page_workbench(request: Request):
+        return _render("workbench.html")
 
 
-@app.get("/ingest", response_class=HTMLResponse)
-async def page_ingest(request: Request):
-    return _render("ingest.html")
+    @app.get("/graph", response_class=HTMLResponse)
+    async def page_graph(request: Request):
+        return _render("graph.html")
 
 
-@app.get("/raw", response_class=HTMLResponse)
-async def page_raw(request: Request):
-    return _render("raw.html")
+    @app.get("/ingest", response_class=HTMLResponse)
+    async def page_ingest(request: Request):
+        return _render("ingest.html")
 
 
-@app.get("/query", response_class=HTMLResponse)
-async def page_query(request: Request):
-    return _render("query.html")
+    @app.get("/raw", response_class=HTMLResponse)
+    async def page_raw(request: Request):
+        return _render("raw.html")
 
 
-@app.get("/lint", response_class=HTMLResponse)
-async def page_lint(request: Request):
-    return _render("lint.html")
+    @app.get("/query", response_class=HTMLResponse)
+    async def page_query(request: Request):
+        return _render("query.html")
 
 
-@app.get("/branches", response_class=HTMLResponse)
-async def page_branches(request: Request):
-    return _render("branches.html")
+    @app.get("/lint", response_class=HTMLResponse)
+    async def page_lint(request: Request):
+        return _render("lint.html")
+
+
+    @app.get("/branches", response_class=HTMLResponse)
+    async def page_branches(request: Request):
+        return _render("branches.html")
+
+
+    @app.get("/log", response_class=HTMLResponse)
+    async def page_log(request: Request):
+        return _render("log.html")
+
+    @app.get("/config", response_class=HTMLResponse)
+    async def page_config(request: Request):
+        return _render("config.html")
 
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
-@app.get("/log", response_class=HTMLResponse)
-async def page_log(request: Request):
-    return _render("log.html")
-
-@app.get("/config", response_class=HTMLResponse)
-async def page_config(request: Request):
-    return _render("config.html")
-
 
 # ============================================================================
 # React SPA — serve built frontend when available
 # ============================================================================
-FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 
 if FRONTEND_DIST.exists():
     @app.get("/{full_path:path}")
