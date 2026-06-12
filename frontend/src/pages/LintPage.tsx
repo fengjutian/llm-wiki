@@ -321,7 +321,7 @@ export default function LintPage() {
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-600 gap-2 p-6">
                       <div className="text-4xl">👈</div>
                       <p className="text-sm">选择左侧问题查看详情</p>
-                    </div>
+                                        </div>
                   )}
                 </div>
               </div>
@@ -329,6 +329,118 @@ export default function LintPage() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Helper sub-components
+// ---------------------------------------------------------------------------
+
+function ScoreCard({ score, summary }: { score: string; summary: any }) {
+  const meta = SCORE_META[score] || SCORE_META.F
+  return (
+    <div className={`rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 flex items-center gap-4 ${meta.ring}`}>
+      <div className={`relative w-16 h-16 rounded-full bg-gradient-to-br ${meta.gradient} flex items-center justify-center text-white text-2xl font-bold shadow-md`}>
+        {score || '?'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className={`text-sm font-semibold ${meta.color}`}>{meta.label}</div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          {summary?.total_issues ?? 0} 个问题 · {summary?.pages_scanned ?? 0} 页扫描
+        </div>
+        {summary?.top_category && (
+          <div className="text-[11px] text-gray-400 mt-0.5">
+            主要类型：<span className="font-mono">{summary.top_category}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StatsCard({ stats }: { stats: any }) {
+  if (!stats) {
+    return (
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 text-sm text-gray-500">
+        <div className="text-xs uppercase tracking-wider text-gray-400 mb-1">统计</div>
+        <div>暂无数据</div>
+      </div>
+    )
+  }
+  const entries = Object.entries(stats).slice(0, 4)
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+      <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">📊 统计</div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+        {entries.map(([k, v]) => (
+          <div key={k} className="flex items-baseline justify-between gap-2">
+            <span className="text-gray-500 dark:text-gray-400 truncate">{k}</span>
+            <span className="font-mono font-semibold text-gray-900 dark:text-gray-100">{String(v)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CountsCard({ counts }: { counts: { critical: number; warning: number; info: number; total: number } }) {
+  const items: { key: keyof typeof SEVERITY_META; meta: typeof SEVERITY_META[keyof typeof SEVERITY_META]; value: number }[] = [
+    { key: 'critical', meta: SEVERITY_META.critical, value: counts.critical },
+    { key: 'warning',  meta: SEVERITY_META.warning,  value: counts.warning },
+    { key: 'info',     meta: SEVERITY_META.info,     value: counts.info },
+  ]
+  return (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+      <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">🔢 问题计数</div>
+      <div className="flex items-center gap-3">
+        {items.map(({ key, meta, value }) => (
+          <div key={key} className="flex-1 text-center">
+            <div className={`text-2xl font-bold ${meta.color}`}>{value}</div>
+            <div className="flex items-center justify-center gap-1 mt-0.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+              <span className="text-[10px] text-gray-500 dark:text-gray-400">{meta.label}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Chip({ active, onClick, dot, label, count }: {
+  active: boolean; onClick: () => void; dot: string; label: string; count: number
+}) {
+  return (
+    <button onClick={onClick} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+      active
+        ? 'bg-white dark:bg-gray-900 shadow-sm text-gray-900 dark:text-gray-100'
+        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+    }`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+      <span>{label}</span>
+      <span className={`px-1 rounded text-[10px] font-mono ${active ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300' : 'bg-gray-200/60 dark:bg-gray-700/60 text-gray-500'}`}>
+        {count}
+      </span>
+    </button>
+  )
+}
+
+function Group<T extends string>({ label, value, onChange, options }: {
+  label: string; value: T; onChange: (v: T) => void; options: { v: T; l: string }[]
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span>{label}：</span>
+      {options.map(o => (
+        <button key={o.v} onClick={() => onChange(o.v)} className={`px-1.5 py-0.5 rounded text-xs transition-colors ${
+          value === o.v
+            ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 font-semibold'
+            : 'hover:bg-gray-200/60 dark:hover:bg-gray-700/60'
+        }`}>
+          {o.l}
+        </button>
+      ))}
     </div>
   )
 }
