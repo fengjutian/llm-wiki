@@ -52,14 +52,33 @@ let viteProcess = null;
 function startVite() {
   const projectRoot = path.join(__dirname, '..');
   const frontendDir = path.join(projectRoot, 'frontend');
-  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  console.log(`[LLM Wiki] Starting Vite dev server (npm run --prefix frontend dev)`);
-  viteProcess = spawn(npmCmd, ['run', '--prefix', frontendDir, 'dev'], {
-    cwd: projectRoot,
-    shell: true,
-    env: { ...process.env, BROWSER: 'none' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  // Call vite directly instead of `npm run dev` so we don't leave a
+  // dangling npm.cmd wrapper that holds onto port 5173 after Vite exits.
+  const isWin = process.platform === 'win32';
+  const viteBin = path.join(frontendDir, 'node_modules', '.bin', isWin ? 'vite.cmd' : 'vite');
+  if (!fs.existsSync(viteBin)) {
+    console.error(`[LLM Wiki] Vite binary not found at ${viteBin}. Run \`npm install\` in the frontend directory.`);
+    return;
+  }
+  console.log(`[LLM Wiki] Starting Vite dev server (${viteBin})`);
+  if (isWin) {
+    // On Windows run via cmd.exe so the .cmd shim is resolved. detached:true
+    // + windowsHide keep the process tree tied to the parent so /T taskkill
+    // cleans everything up on stopVite().
+    viteProcess = spawn('cmd.exe', ['/c', viteBin], {
+      cwd: frontendDir,
+      detached: false,
+      windowsHide: true,
+      env: { ...process.env, BROWSER: 'none' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } else {
+    viteProcess = spawn(viteBin, [], {
+      cwd: frontendDir,
+      env: { ...process.env, BROWSER: 'none' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  }
   viteProcess.stdout.on('data', d => console.log(`[Vite] ${d.toString().trim()}`));
   viteProcess.stderr.on('data', d => console.error(`[Vite:err] ${d.toString().trim()}`));
   viteProcess.on('close', code => {
