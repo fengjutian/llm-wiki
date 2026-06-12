@@ -6,15 +6,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   isElectron: true,
 
-  // Window controls (can be extended for frameless window)
+  // Window controls
   minimize: () => ipcRenderer.send('window:minimize'),
   maximize: () => ipcRenderer.send('window:maximize'),
   close: () => ipcRenderer.send('window:close'),
 
-  // File dialogs (optional – for future native file picker)
+  // File dialogs
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   saveFile: (content, defaultName) => ipcRenderer.invoke('dialog:saveFile', content, defaultName),
 
-  // App events
+  // Notifications
+  notify: (title, body) => ipcRenderer.send('notify', title, body),
+
+  // Menu / shortcut events from main process
+  onNewPage: (callback) => ipcRenderer.on('menu:new-page', () => callback()),
+  onShortcutNewPage: (callback) => ipcRenderer.on('shortcut:new-page', () => callback()),
+
+  // Theme events
   onThemeChange: (callback) => ipcRenderer.on('theme:changed', (_, theme) => callback(theme)),
+
+  // Remove listeners (cleanup)
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
 });

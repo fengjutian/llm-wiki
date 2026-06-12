@@ -11,10 +11,7 @@
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux"
   },
-  "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.0.0"
-  },
+
   "build": {
     "appId": "com.llm-wiki.app",
     "productName": "LLM Wiki",
@@ -52,9 +49,18 @@
     "linux": {
       "target": "AppImage",
       "icon": null
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "your-org",
+      "repo": "llm-wiki"
     }
   },
   "dependencies": {
-    "string-width": "^8.2.1"
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.0.0"
   }
 }

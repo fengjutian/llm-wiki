@@ -1,4 +1,6 @@
 # Wiki Index
+## concept
+- [[Promotion Type]] – Enumeration of the three promotion types: promotion, referral_code, coupon_code.
 ## other
 - [[2025-01-14_1035_vue-component-refactor-copy-mode-fix.md]] – Source document: Vue Promotion Form refactoring and copy mode bug fix.
 - [[2025-05-20_1035_vue-component-refactor-copy-mode-fix]] – Source: Vue Promotion Form refactoring and copy mode bug fix.
@@ -12,37 +14,51 @@
 - [[AsyncUnitOfWork]] – Class managing database session and transactions
 - [[BP数-Sample数-detail.md]] – Source document explaining Sample数 (sample count) and BP数 (base pairs) in a biological sequencing order system.
 - [[BP数.md]] – The length of the DNA template in base pairs, used for per-base-pair pricing in sequencing services.
+- [[ConditionEvaluator]] – Base class/interface for condition evaluation in the promotion system.
+- [[ConditionFactory]] – Factory class that constructs condition evaluators (GroupCondition, LeafCondition) from a tree data structure.
+- [[ConditionLeaf (Request Model)]] – Recursive Pydantic model for the condition tree node in promotion API requests.
 - [[Copy Scenario Data Isolation Pattern]] – Design pattern requiring copy operations to clear identifiers and regenerate unique fields.
 - [[CouponRepo]] – Repository providing get_promotion_tracking_stmt for aggregated coupon data.
 - [[CouponService]] – Backend service handling promotion_tracking_download streaming logic.
 - [[DRY Repository SQL Builder Pattern]] – Pattern of sharing a single SQL statement builder between list and export queries.
 - [[DiscountType]] – Classification of discount types (percent, fixed, per_fixed, tier, tier_qty).
 - [[Dynamic-Search-Options-Loading.md]] – Concept: pattern for dynamically loading search filter options using a backend API and the loadingSearch flag in Vue pages.
+- [[EvaluationContext]] – Data object holding all contextual values (customer attributes, product_id, category_id, region) used during condition evaluation.
 - [[Exceeding-Tier]] – The open-ended infinity tier in sales amount tier with max_price = null.
 - [[FastAPI Dependency Injection Alias Pattern]] – Pattern of using Annotated+Depends to create reusable injection types
 - [[Field Whitelist]] – Server-side filtering to exclude password, password2, code from stored drafts.
 - [[Frequency Limiting (60s per email)]] – Rate limit of one draft save per email per 60 seconds with row lock.
 - [[Go]] – Go programming language version 1.26.4 installed via winget.
 - [[Go Build Ldflags]] – Pattern for embedding build version, commit, and date into Go binaries using -ldflags -X.
+- [[GroupCondition]] – Evaluator for AND/OR groups of conditions, evaluating children recursively.
 - [[Hardware-Aware-SSM-Algorithm.md]] – Parallel scan CUDA kernel avoiding state matrix materialization for efficient SSM computation.
 - [[ID Retention in Copy Mode]] – Concept describing how copy mode retains the original id, enabling duplicate code creation.
 - [[Iter Paged Export]] – Utility for batch-reading database results for streaming exports.
+- [[LeafCondition]] – Evaluator for a single condition (e.g., category_id, new_reg_customer) against an EvaluationContext.
 - [[Mamba.md]] – Architecture combining selective SSMs and hardware-aware algorithm to achieve O(N) sequence modeling.
 - [[Multi-Head-Attention]] – Parallel attention projections enabling joint attention to different representation subspaces.
 - [[Order (Database Table)]] – Database table for customer orders; includes promotion_code field referencing Promotion table.
+- [[OrderPreview]] – Pydantic model or query object containing referral_code, coupon_id, promotion_code fields, used by usePromotion to select entry point.
 - [[Positional-Encoding]] – Sinusoidal encodings added to input embeddings to convey token position in non-recurrent models.
 - [[Product-Category]] – Tree-structured category table (product_categories) used to classify products.
 - [[Product-List]] – Database table and module for individual products, with fields like name, price, and a category_id foreign key.
 - [[Project Installation (项目安装)]] – Installation of Go 1.26.4 and compilation of opencodereview with version ldflags.
 - [[Promotion (Database Table)]] – Core database table storing promotions; uses promotion_type to differentiate promotion, referral_code, and coupon_code.
+- [[Promotion Error Codes]] – Centralized list of error codes used by the promotion module.
 - [[Promotion Export Endpoint]] – GET /backend/promotion/download streaming CSV with group filter and array fix
 - [[Promotion List Endpoint]] – POST /backend/promotion/list with fuzzy and subquery filters
+- [[Promotion System Technical Specification (Source)]] – 2025-06-02 technical spec for the promotion management module, covering DB schema, API, discount types, conditions, and frontend.
 - [[Promotion Tracking Export Endpoint]] – GET endpoint for streaming CSV export of promotion usage data.
 - [[Promotion-Index-Page.md]] – Entity: the Vue list page for promotions (Index.vue) with dynamic search options for service, customer, and region.
 - [[PromotionCondition]] – Database table for promotion eligibility conditions (customer, category, region).
+- [[PromotionCondition (Database Table)]] – Table storing hierarchical condition rules used in promotion eligibility checking.
 - [[PromotionError]] – Enum of error codes used in promotion validation.
 - [[PromotionRequest]] – Pydantic model validating promotion creation/update API requests.
+- [[PromotionRequest (Pydantic Model)]] – Request body model for creating/updating promotions, including condition tree and tier config.
+- [[PromotionService (Backend Service)]] – Service class handling all promotion business logic, including CRUD, activation, discount calculation, and export.
+- [[PromotionTier (Database Table)]] – Table storing tiered discount rules for promotions with price range thresholds.
 - [[PromotionUsage]] – Database table logging promotion usage per order.
+- [[PromotionUsage (Database Table)]] – Table recording each use of a promotion by a customer and order.
 - [[Register Form Draft API Endpoints]] – Three public API routes for draft save, retrieve, and soft delete.
 - [[Register Form Draft Service]] – Business logic for draft CRUD, rate limiting, and state determination.
 - [[RegisterFormDraft]] – SQLModel ORM model for registration form drafts with soft delete and JSON storage.
@@ -52,6 +68,7 @@
 - [[Selective-State-Spaces.md]] – Input-dependent SSM parameters that enable dynamic information propagation.
 - [[Self-Attention]] – Attention mechanism relating different positions of a single sequence to compute its representation.
 - [[Soft Delete Drafts]] – Flag-based soft deletion for drafts with planned 30-day hard delete.
+- [[Source-Product-List-Product-Category-Analysis]] – Analysis of Product List and Product Category modules, their tables, and 1:N relationship.
 - [[State Branch Logic in Register Form Draft]] – Determines user registration step based on verify_email and user tables.
 - [[State-Space-Models.md]] – Recurrent models with linear state transitions, predecessors to Mamba.
 - [[Streaming Export Response]] – FastAPI helper to stream CSV files with correct headers.
@@ -86,5 +103,3 @@
 - [[vue-mode-pattern.md]] – Pattern for distinguishing forms modes (create, edit, copy) using three props and computed isCopyMode.
 - [[winget]] – Windows Package Manager used to install Go.
 - [[数量阶梯折扣.md]] – Tiered discount pricing based on sample count, with two levels triggered by volume thresholds.
-## source_summary
-- [[Source-Product-List-Product-Category-Analysis]] – Analysis of Product List and Product Category modules, their tables, and 1:N relationship.
