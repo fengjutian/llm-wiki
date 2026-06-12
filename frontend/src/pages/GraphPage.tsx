@@ -9,8 +9,9 @@ export default function GraphPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [dims, setDims] = useState({ w: 800, h: 600 })
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [dims, setDims] = useState({ w: 0, h: 0 })
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const observerRef = useRef<ResizeObserver | null>(null)
   const graphRef = useRef<any>(null)
   const theme = useThemeStore(s => s.theme)
   const isDark = theme === 'dark'
@@ -19,16 +20,30 @@ export default function GraphPage() {
     api.get<GraphData>('/api/graph').then(d => { setData(d); setLoading(false) })
   }, [])
 
-  // Responsive sizing
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
+  // Callback ref: fires synchronously when the container DOM node mounts / unmounts.
+  // This handles conditional rendering correctly — the callback is called exactly
+  // when the element is attached, even if it first appears after data loads.
+  const measureRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect()
+      observerRef.current = null
+    }
+    containerRef.current = node
+    if (!node) return
+
+    const rect = node.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) {
+      setDims({ w: rect.width, h: rect.height })
+    }
+
     const obs = new ResizeObserver(entries => {
       const { width, height } = entries[0].contentRect
-      setDims({ w: width, h: height })
+      if (width > 0 && height > 0) {
+        setDims({ w: width, h: height })
+      }
     })
-    obs.observe(el)
-    return () => obs.disconnect()
+    obs.observe(node)
+    observerRef.current = obs
   }, [])
 
   const nodeColor = useCallback((n: any) => {
@@ -48,8 +63,8 @@ export default function GraphPage() {
         <button onClick={() => graphRef.current?.zoomToFit(400)} className="text-xs text-gray-500 hover:text-cyan-600 dark:hover:text-cyan-400">Fit view</button>
       </div>
       {loading ? <p className="text-gray-500">Loading graph...</p> : data ? (
-        <div ref={containerRef} className="flex-1 min-h-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden relative">
-          <ForceGraph2D
+        <div ref={measureRef} className="flex-1 min-h-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden relative">
+          {dims.w > 0 && dims.h > 0 && <ForceGraph2D
             ref={graphRef}
             graphData={{
               nodes: data.nodes.filter(n => !search || n.title.toLowerCase().includes(search.toLowerCase())),
@@ -77,7 +92,7 @@ export default function GraphPage() {
             backgroundColor="transparent"
             width={dims.w}
             height={dims.h}
-          />
+          />}
           {selectedNode && (
             <div className="absolute top-4 right-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-xl max-w-xs">
               <div className="flex items-center justify-between mb-2">
