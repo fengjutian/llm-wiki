@@ -52,7 +52,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "your-org",
+      "owner": "YOUR_GITHUB_USER_OR_ORG",
       "repo": "llm-wiki"
     }
   },

@@ -18,13 +18,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Notifications
   notify: (title, body) => ipcRenderer.send('notify', title, body),
 
-  // Menu / shortcut events from main process
-  onNewPage: (callback) => ipcRenderer.on('menu:new-page', () => callback()),
-  onShortcutNewPage: (callback) => ipcRenderer.on('shortcut:new-page', () => callback()),
+  // Menu / shortcut events from main process — returns unsubscribe function
+  onNewPage: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('menu:new-page', handler)
+    return () => ipcRenderer.removeListener('menu:new-page', handler)
+  },
+  onShortcutNewPage: (callback) => {
+    const handler = () => callback()
+    ipcRenderer.on('shortcut:new-page', handler)
+    return () => ipcRenderer.removeListener('shortcut:new-page', handler)
+  },
 
-  // Theme events
-  onThemeChange: (callback) => ipcRenderer.on('theme:changed', (_, theme) => callback(theme)),
-
-  // Remove listeners (cleanup)
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+  // Theme events — returns unsubscribe function
+  onThemeChange: (callback) => {
+    const handler = (_, theme) => callback(theme)
+    ipcRenderer.on('theme:changed', handler)
+    return () => ipcRenderer.removeListener('theme:changed', handler)
+  },
 });

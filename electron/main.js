@@ -35,7 +35,7 @@ const OFFLINE_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>LL
 </style></head><body><div class="box"><h1>&#x1F4DA; LLM Wiki</h1>
 <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 <p>Waiting for backend server to start&hellip;</p><p id="status"></p>
-<button class="btn" onclick="location.reload()">Retry</button></div>
+<button class="btn" onclick="location.href=`http://${HOST}:${PORT}`">Retry</button></div>
 <script>var n=0;setInterval(function(){n++;document.getElementById('status').textContent='Attempt '+n+' of 30...'},1000)</script></body></html>`;
 
 // ---------------------------------------------------------------------------
@@ -131,10 +131,16 @@ function createWindow() {
 
   mainWindow.loadURL(`http://${HOST}:${PORT}`);
 
-  // Show offline page if loading fails
-  mainWindow.webContents.on('did-fail-load', () => {
-    mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(OFFLINE_HTML)}`);
+  // Show offline page only for initial backend load failures
+  let backendReady = false
+  mainWindow.webContents.on('did-fail-load', (event, code, desc, url, isMainFrame) => {
+    if (!backendReady && isMainFrame) {
+      mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(OFFLINE_HTML)}`);
+    }
   });
+
+  // Return cleanup function for external use
+  mainWindow._markBackendReady = () => { backendReady = true }
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
@@ -312,9 +318,15 @@ if (!gotLock) { app.quit(); } else {
     try {
       await waitForServer(`http://${HOST}:${PORT}/health`);
       console.log('[LLM Wiki] Backend ready');
-      if (mainWindow) mainWindow.loadURL(`http://${HOST}:${PORT}`);
+      if (mainWindow) {
+        mainWindow._markBackendReady?.();
+        mainWindow.loadURL(`http://${HOST}:${PORT}`);
+      }
     } catch (err) {
       console.error(`[LLM Wiki] ${err.message}`);
+      dialog.showErrorBox('Backend Failed', `The backend server could not be started.\n\n${err.message}\n\nPlease check that Python 3.11+ and all dependencies are installed.`);
+      app.quit();
+      return;
     }
 
     app.on('activate', () => {
