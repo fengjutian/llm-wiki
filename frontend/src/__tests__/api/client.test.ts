@@ -13,7 +13,7 @@ describe('api client', () => {
     } as Response)
     const result = await api.get<{ data: string }>('/test')
     expect(result).toEqual({ data: 'hello' })
-    expect(fetch).toHaveBeenCalledWith('/test', undefined)
+    expect(fetch).toHaveBeenCalledWith('/test', expect.objectContaining({ signal: expect.any(AbortSignal) }))
   })
 
   it('api.post sends JSON body', async () => {
@@ -23,11 +23,11 @@ describe('api client', () => {
     } as Response)
     const result = await api.post<{ id: number }>('/test', { name: 'x' })
     expect(result).toEqual({ id: 1 })
-    expect(fetch).toHaveBeenCalledWith('/test', {
+    expect(fetch).toHaveBeenCalledWith('/test', expect.objectContaining({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'x' }),
-    })
+    }))
   })
 
   it('api throws ApiError on non-ok response', async () => {

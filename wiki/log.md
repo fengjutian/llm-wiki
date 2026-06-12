@@ -783,3 +783,27 @@ Top issues:
   [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
   [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
 
+## [2026-06-12 05:07] lint | Health check | branch: main
+Score: C | Critical: 0 | Warnings: 38 | Info: 0
+Wiki size: 96 pages, 217 links
+Auto-fix: no
+Issue types: orphan: 37, source_integrity: 1
+Top issues:
+  [warning] orphan: Page '2025-05-20 Source: Vue Promotion Form 重构与复制模式修复' has no incoming links
+  [warning] orphan: Page '2025-05-20_1035 Vue Component Refactor Copy Mode Fix' has no incoming links
+  [warning] orphan: Page '2026-01-06 Source: Promotion Copy Code Duplicate Bug' has no incoming links
+  [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
+  [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
+
+## [2026-06-12 05:07] lint | Health check | branch: main
+Score: C | Critical: 0 | Warnings: 38 | Info: 0
+Wiki size: 96 pages, 217 links
+Auto-fix: no
+Issue types: orphan: 37, source_integrity: 1
+Top issues:
+  [warning] orphan: Page '2025-05-20 Source: Vue Promotion Form 重构与复制模式修复' has no incoming links
+  [warning] orphan: Page '2025-05-20_1035 Vue Component Refactor Copy Mode Fix' has no incoming links
+  [warning] orphan: Page '2026-01-06 Source: Promotion Copy Code Duplicate Bug' has no incoming links
+  [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
+  [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
+

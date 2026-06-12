@@ -253,14 +253,24 @@ function showNotification(title, body) {
 // ---------------------------------------------------------------------------
 function setupAutoUpdater() {
   // In production, uncomment and add electron-updater dependency:
-  // const { autoUpdater } = require('electron-updater');
-  // autoUpdater.checkForUpdatesAndNotify();
-  // autoUpdater.on('update-available', () => showNotification('LLM Wiki', 'A new version is available!'));
-  // autoUpdater.on('update-downloaded', () => {
-  //   showNotification('LLM Wiki', 'Update downloaded. Restart to apply.');
-  //   dialog.showMessageBox(mainWindow, { title: 'Update Ready', message: 'A new version has been downloaded.', buttons: ['Restart Now', 'Later'], defaultId: 0 }).then(({ response }) => { if (response === 0) autoUpdater.quitAndInstall(); });
-  // });
-  console.log('[LLM Wiki] Auto-updater: install electron-updater to enable');
+  try {
+    const { autoUpdater } = require('electron-updater')
+    if (!DEV_MODE) {
+      autoUpdater.checkForUpdatesAndNotify()
+      autoUpdater.on('update-available', () => showNotification('LLM Wiki', 'A new version is available!'))
+      autoUpdater.on('update-downloaded', () => {
+        showNotification('LLM Wiki', 'Update downloaded. Restart to apply.')
+        dialog.showMessageBox(mainWindow, {
+          title: 'Update Ready', message: 'A new version has been downloaded. Restart now to apply.',
+          buttons: ['Restart Now', 'Later'], defaultId: 0,
+        }).then(({ response }) => { if (response === 0) autoUpdater.quitAndInstall() })
+      })
+      autoUpdater.on('error', (err) => console.error('[LLM Wiki] Auto-updater error:', err.message))
+      console.log('[LLM Wiki] Auto-updater enabled')
+    }
+  } catch (e) {
+    console.log('[LLM Wiki] Auto-updater not available:', e.message)
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -28,7 +28,7 @@ export default function WorkbenchPage() {
 
   const del = async (name: string) => {
     if (!confirm(`Delete ${name}?`)) return
-    try { await api.delete(`/api/workbench/projects/${name}`); load(); addToast(`Deleted ${name}`) }
+    try { await api.del(`/api/workbench/projects/${name}`); load(); addToast(`Deleted ${name}`) }
     catch { addToast('Failed') }
   }
 

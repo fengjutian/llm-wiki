@@ -8,10 +8,24 @@ export default function GraphPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
+  const [dims, setDims] = useState({ w: 800, h: 600 })
+  const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<any>(null)
 
   useEffect(() => {
     api.get<GraphData>('/api/graph').then(d => { setData(d); setLoading(false) })
+  }, [])
+
+  // Responsive sizing
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const obs = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect
+      setDims({ w: width, h: height })
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [])
 
   const nodeColor = useCallback((n: any) => {
@@ -22,7 +36,7 @@ export default function GraphPage() {
   const handleNodeClick = useCallback((n: any) => setSelectedNode(n as GraphNode), [])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ height: 'calc(100vh - 100px)' }}>
       <div className="flex items-center gap-4 mb-4 shrink-0">
         <h1 className="text-2xl font-bold">Knowledge Graph</h1>
         <input value={search} onChange={e => setSearch(e.target.value)}
@@ -30,9 +44,8 @@ export default function GraphPage() {
         {data && <span className="text-xs text-gray-500">{data.nodes.length} nodes, {data.edges.length} edges</span>}
         <button onClick={() => graphRef.current?.zoomToFit(400)} className="text-xs text-gray-500 hover:text-cyan-400">Fit view</button>
       </div>
-
       {loading ? <p className="text-gray-500">Loading graph...</p> : data ? (
-        <div className="flex-1 bg-gray-900 rounded-xl overflow-hidden relative">
+        <div ref={containerRef} className="flex-1 bg-gray-900 rounded-xl overflow-hidden relative">
           <ForceGraph2D
             ref={graphRef}
             graphData={{
@@ -49,19 +62,18 @@ export default function GraphPage() {
               ctx.textBaseline = 'middle'
               ctx.fillStyle = nodeColor(n)
               ctx.beginPath()
-              const r = Math.max(3, 6 / Math.sqrt(scale))
-              ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI)
+              ctx.arc(n.x!, n.y!, Math.max(3, 6 / Math.sqrt(scale)), 0, 2 * Math.PI)
               ctx.fill()
               ctx.fillStyle = '#e0e0e0'
-              ctx.fillText(label, n.x!, n.y! + r + fontSize * 0.6)
+              ctx.fillText(label, n.x!, n.y! + Math.max(3, 6 / Math.sqrt(scale)) + fontSize * 0.6)
             }}
             linkColor={() => '#30363d'}
             linkDirectionalArrowLength={4}
             linkDirectionalArrowRelPos={1}
             onNodeClick={handleNodeClick}
             backgroundColor="transparent"
-            width={800}
-            height={600}
+            width={dims.w}
+            height={dims.h}
           />
           {selectedNode && (
             <div className="absolute top-4 right-4 bg-gray-800 border border-gray-700 rounded-xl p-4 shadow-xl max-w-xs">
@@ -72,8 +84,7 @@ export default function GraphPage() {
               <div className="text-xs text-gray-400 space-y-1">
                 <div>Type: {selectedNode.page_type}</div>
                 <div>Status: {selectedNode.status}</div>
-                <div>In-links: {selectedNode.in_degree}</div>
-                <div>Out-links: {selectedNode.out_degree}</div>
+                <div>In-links: {selectedNode.in_degree} | Out-links: {selectedNode.out_degree}</div>
               </div>
             </div>
           )}
