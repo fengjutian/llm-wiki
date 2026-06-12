@@ -253,4 +253,82 @@ export default function LintPage() {
                                     : 'hover:border-cyan-300 dark:hover:border-cyan-700'
                                 }`}>
                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <span className={`text
+                                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${meta.color} bg-white/40 dark:bg-black/20 border ${meta.border}`}>
+                                    {i.type || 'unknown'}
+                                  </span>
+                                  <span className={`text-[10px] uppercase tracking-wider font-semibold ${meta.color}`}>
+                                    {meta.label}
+                                  </span>
+                                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                    · 影响 {(i.affected_pages?.length ?? 0)} 页
+                                  </span>
+                                </div>
+                                <div className={`text-sm ${meta.color} line-clamp-2`}>
+                                  {i.description || ''}
+                                </div>
+                                {i.suggestion && (
+                                  <div className="mt-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
+                                    💡 {i.suggestion}
+                                  </div>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Issue detail (right pane) */}
+                <div className="lg:col-span-2 min-h-0 flex flex-col bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+                  {selected ? (
+                    <>
+                      <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-gray-800/40">
+                        <span className="text-sm font-semibold">📝 问题详情</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${SEVERITY_META[selected.severity || 'info'].color} ${SEVERITY_META[selected.severity || 'info'].bg} border ${SEVERITY_META[selected.severity || 'info'].border}`}>
+                          {SEVERITY_META[selected.severity || 'info'].label}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 text-sm">
+                        <div>
+                          <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">类型</div>
+                          <div className="font-mono">{selected.type || 'unknown'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">描述</div>
+                          <div className="whitespace-pre-wrap">{selected.description || ''}</div>
+                        </div>
+                        {selected.suggestion && (
+                          <div>
+                            <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">修复建议</div>
+                            <div className="whitespace-pre-wrap text-gray-700 dark:text-gray-300">{selected.suggestion}</div>
+                          </div>
+                        )}
+                        {(selected.affected_pages?.length ?? 0) > 0 && (
+                          <div>
+                            <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">受影响的页面 ({selected.affected_pages!.length})</div>
+                            <ul className="space-y-1">
+                              {selected.affected_pages!.map((p, idx) => (
+                                <li key={idx} className="px-2 py-1 rounded bg-gray-50 dark:bg-gray-800/60 text-xs font-mono break-all">{p}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-600 gap-2 p-6">
+                      <div className="text-4xl">👈</div>
+                      <p className="text-sm">选择左侧问题查看详情</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
