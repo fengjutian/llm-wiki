@@ -51,10 +51,58 @@ class Source:
 @dataclass
 class LogEntry:
     timestamp: str
-    operation: str  # ingest | query | lint | merge
+    operation: str  # ingest | query | lint | merge | branch_create | checkout
     title: str
     branch: str = "main"
     details: str = ""
+    status: str = ""  # success | warning | error | info | skipped
+    duration_seconds: Optional[float] = None
+    sections: list = field(default_factory=list)  # parsed detail sections
+    metrics: list = field(default_factory=list)  # parsed key:value metrics
+
+    def to_dict(self) -> dict:
+        """Serialise for API responses (dataclass → dict)."""
+        return {
+            "timestamp": self.timestamp,
+            "operation": self.operation,
+            "title": self.title,
+            "branch": self.branch,
+            "details": self.details,
+            "status": self.status or self._infer_status(),
+            "duration_seconds": self.duration_seconds,
+            "sections": self.sections,
+            "metrics": self.metrics,
+        }
+
+    def _infer_status(self) -> str:
+        """Infer a status badge from operation/metrics when not explicitly set."""
+        op = (self.operation or "").lower()
+        if op == "lint":
+            for m in self.metrics:
+                if m.get("key") == "Score":
+                    score = (m.get("value") or "").split()[0] if m.get("value") else ""
+                    if score in ("A", "B"):
+                        return "success"
+                    if score == "C":
+                        return "warning"
+                    if score in ("D", "F"):
+                        return "error"
+        if op == "ingest":
+            for m in self.metrics:
+                if m.get("key") == "Status":
+                    val = (m.get("value") or "").lower()
+                    if val in ("ingested", "modified", "pending"):
+                        return "success"
+                    if val == "skipped":
+                        return "info"
+                    if val == "failed":
+                        return "error"
+        if op in ("query", "merge", "branch_create", "checkout"):
+            if any(m.get("key") == "Status" and "fail" in (m.get("value") or "").lower()
+                   for m in self.metrics):
+                return "error"
+            return "success"
+        return self.status or "info"
 
 
 # ---------------------------------------------------------------------------
@@ -345,7 +393,7 @@ def read_log(last_n: int = 20) -> list[LogEntry]:
 
 
 def parse_log() -> list[LogEntry]:
-    """Parse all entries from log.md."""
+    """Parse all entries from log.md, including structured detail fields."""
     lp = _log_path()
     if not lp.exists():
         return []
@@ -363,6 +411,7 @@ def parse_log() -> list[LogEntry]:
         m = pattern.match(line.strip())
         if m:
             if current:
+                _finalise_entry(current, details)
                 entries.append(LogEntry(**current))
             current = {
                 "timestamp": m.group(1),
@@ -370,16 +419,103 @@ def parse_log() -> list[LogEntry]:
                 "title": m.group(3).strip(),
                 "branch": m.group(4) or "main",
                 "details": "",
+                "status": "",
+                "duration_seconds": None,
+                "sections": [],
+                "metrics": [],
             }
             details = []
         elif current and line.strip():
             details.append(line.strip())
 
     if current:
-        current["details"] = "\n".join(details)
+        _finalise_entry(current, details)
         entries.append(LogEntry(**current))
 
     return entries
+
+
+def _finalise_entry(current: dict, details: list[str]) -> None:
+    """Finalise an entry's raw + parsed fields from collected detail lines."""
+    current["details"] = "\n".join(details)
+    metrics, sections = _parse_detail_lines(details)
+    current["metrics"] = metrics
+    current["sections"] = sections
+
+
+def _parse_detail_lines(lines: list[str]) -> tuple[list[dict], list[dict]]:
+    """Parse raw detail lines into metrics (key:value) and sections (lists).
+
+    Returns:
+        (metrics, sections)
+        metrics: [{"key": "...", "value": "..."}]
+        sections: [{"heading": "...", "items": ["..."]}]
+    """
+    metrics: list[dict] = []
+    sections: list[dict] = []
+    if not lines:
+        return metrics, sections
+
+    # First pass: identify "key: value" lines and "key (count): value" lines
+    key_pattern = __import__("re").compile(r"^([^:]+?)\s*(\(\d+\))?\s*:\s*(.+)$")
+
+    # Group consecutive indented lines as a list under the preceding key
+    current_section: dict | None = None
+
+    for raw in lines:
+        if not raw.strip():
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        stripped = raw.strip()
+
+        if indent > 0:
+            # Indented → belongs to current section (if any)
+            if current_section is not None:
+                current_section["items"].append(stripped)
+            else:
+                # stray indented line → put into a misc section
+                misc = next((s for s in sections if s["heading"] == "Details"), None)
+                if misc is None:
+                    misc = {"heading": "Details", "items": []}
+                    sections.append(misc)
+                misc["items"].append(stripped)
+            continue
+
+        # Top-level line: try key: value
+        m = key_pattern.match(stripped)
+        if not m:
+            # Heuristic: it might be a section header like "Top issues:"
+            if stripped.endswith(":") and len(stripped) < 60:
+                heading = stripped.rstrip(":").strip()
+                current_section = {"heading": heading, "items": []}
+                sections.append(current_section)
+            else:
+                # Free-text line
+                metrics.append({"key": "Note", "value": stripped})
+                current_section = None
+            continue
+
+        key = m.group(1).strip()
+        # Strip stray parentheses from key, but keep count separately
+        count = None
+        if m.group(2):
+            count = m.group(2).strip("()")
+        value = m.group(3).strip()
+
+        metrics.append({"key": key, "value": value, **({"count": int(count)} if count else {})})
+
+        # If value looks like a list ("a, b, c") and is short, expand into section items
+        if "," in value and len(value) < 500 and value not in ("\u2014", "-"):
+            items = [v.strip() for v in value.split(",") if v.strip() and v.strip() != "\u2014"]
+            if len(items) >= 2:
+                current_section = {"heading": key, "items": items, "count": len(items)}
+                sections.append(current_section)
+            else:
+                current_section = None
+        else:
+            current_section = None
+
+    return metrics, sections
 
 
 def format_log_timestamp(dt: Optional[datetime] = None) -> str:
