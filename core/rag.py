@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+# Lazy imports - chromadb and langchain_text_splitters loaded on first use
 
 from core.config import get_settings
 from core.llm import get_llm_client
@@ -86,7 +86,7 @@ class RAGEngine:
     def get_status(self) -> dict:
         col = self._get_collection()
         count = col.count() if col else 0
-        meta = col.metadata if col else {}
+        meta = (col.metadata if col else None) or {}
         return {
             "enabled": self.settings.rag_enabled,
             "chunk_count": count,
@@ -150,7 +150,14 @@ class RAGEngine:
         metadatas = [{"file": c.source_file, "chunk_idx": c.chunk_index} for c in all_chunks]
         ids = [f"{c.source_file}:{c.chunk_index}" for c in all_chunks]
 
-        embeddings = self._embed_texts(texts)
+        try:
+            embeddings = self._embed_texts(texts)
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Embedding failed: {e}. Set rag_embedding_model in settings.json to a model that supports /embeddings (e.g. text-embedding-3-small on OpenAI).",
+                "model_tried": self._get_embedding_model(),
+            }
 
         # Store
         col.add(ids=ids, embeddings=embeddings, documents=texts, metadatas=metadatas)
@@ -268,6 +275,7 @@ class RAGEngine:
     # ------------------------------------------------------------------
 
     def _chunk_document(self, text: str, filename: str) -> list[RAGChunk]:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.settings.rag_chunk_size,
             chunk_overlap=self.settings.rag_chunk_overlap,
@@ -296,10 +304,10 @@ class RAGEngine:
         if configured:
             self._embedding_model = configured
             return configured
-        # Auto-detect: use small model if it looks like an embedding model, else default
-        small = self.settings.llm_small_model
-        if small and "embed" in small.lower():
-            self._embedding_model = small
+        # Auto-detect from base URL
+        base = self.settings.llm_api_base.lower()
+        if "deepseek" in base:
+            self._embedding_model = "deepseek-chat"  # DeepSeek's chat model supports embeddings too
         else:
             self._embedding_model = "text-embedding-3-small"
         return self._embedding_model
@@ -340,3 +348,15 @@ class RAGEngine:
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_path = cache_dir / "hash_cache.json"
         cache_path.write_text(json.dumps(self._hash_cache))
+
+
+# Module-level singleton
+_rag_engine: Optional[RAGEngine] = None
+
+
+def get_rag_engine() -> RAGEngine:
+    """Return a cached singleton RAGEngine."""
+    global _rag_engine
+    if _rag_engine is None:
+        _rag_engine = RAGEngine()
+    return _rag_engine

@@ -1,0 +1,1 @@
+[cache hygiene: omitted completed write.content argument, 1.3KB, approx 384 token(s), 35 line(s); see following tool result] preview="lines = [ 'const BASE = \"\"', 'const DEFAULT_TIMEOUT = 15000', '', 'export class ApiError extends Error {', '  constructor(public s"

@@ -698,6 +698,7 @@ from api.impact import router as impact_router
 from api.branch import router as branch_router
 from api.webhook import router as webhook_router
 from api.workbench import router as workbench_router
+from api.rag import router as rag_router
 
 app.include_router(entity_router)
 app.include_router(graph_router)
@@ -705,6 +706,7 @@ app.include_router(impact_router)
 app.include_router(branch_router)
 app.include_router(webhook_router)
 app.include_router(workbench_router)
+app.include_router(rag_router)
 
 
 # ============================================================================
