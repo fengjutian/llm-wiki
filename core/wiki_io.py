@@ -227,6 +227,24 @@ def list_pages() -> list[str]:
     return titles
 
 
+def list_pages_with_data() -> list[WikiPage]:
+    """List all wiki pages with full data in a single filesystem pass.
+    
+    Avoids the double-read pattern where callers do list_pages() + read_page().
+    """
+    root = _wiki_root()
+    if not root.exists():
+        return []
+    pages: list[WikiPage] = []
+    for f in sorted(root.rglob("*.md")):
+        if f.name in ("index.md", "log.md"):
+            continue
+        page = read_page(f.stem)
+        if page:
+            pages.append(page)
+    return pages
+
+
 # ---------------------------------------------------------------------------
 # Source I/O
 # ---------------------------------------------------------------------------

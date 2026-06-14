@@ -87,22 +87,68 @@ class LintReport:
 # ---------------------------------------------------------------------------
 
 
-def _collect_existing_pages() -> str:
-    """Gather all existing wiki pages as a single string for LLM context."""
-    titles = list_pages()
-    if not titles:
+def _rank_pages_by_relevance(question: str, pages: list, top_n: int = 15) -> list:
+    """Rank wiki pages by keyword relevance to the question.
+
+    Uses simple word-overlap scoring (no embeddings needed) so it works
+    even without ChromaDB installed.
+    """
+    if not question or not pages:
+        return pages[:top_n]
+
+    query_words = set(question.lower().split())
+    if not query_words:
+        return pages[:top_n]
+
+    scored = []
+    for page in pages:
+        title = page.title if hasattr(page, 'title') else str(page)
+        content = page.content if hasattr(page, 'content') else ""
+        # Score title matches higher, then content matches
+        title_lower = title.lower()
+        content_lower = content.lower()
+        title_score = sum(1 for w in query_words if w in title_lower) / max(len(query_words), 1)
+        content_score = sum(1 for w in query_words if w in content_lower) / max(len(query_words), 1)
+        # Bonus for exact phrase match
+        phrase_bonus = 0.3 if question.lower() in (title_lower + " " + content_lower) else 0.0
+        score = title_score * 2.0 + content_score + phrase_bonus
+        if score > 0:
+            scored.append((score, page))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [p for _, p in scored[:top_n]]
+
+
+def _collect_existing_pages(question: str = "", top_n: int = 15, max_chars_per_page: int = 2000) -> str:
+    """Gather wiki pages as a single string for LLM context.
+
+    When *question* is provided, pages are ranked by keyword relevance and
+    only the top *top_n* pages are included.  Otherwise all pages are
+    included (capped at *top_n*).
+
+    Uses list_pages_with_data() for a single filesystem pass.
+    """
+    from core.wiki_io import list_pages_with_data
+
+    all_pages = list_pages_with_data()
+    if not all_pages:
         return "_(empty wiki)_"
 
+    # Rank by relevance if question provided, otherwise take first N
+    if question:
+        relevant = _rank_pages_by_relevance(question, all_pages, top_n)
+    else:
+        relevant = all_pages[:top_n]
+
     parts = []
-    for title in titles:
-        page = read_page(title)
-        if page:
-            # give more context per page so LLM can avoid duplicates
-            parts.append(f"### {title}\n\n{page.content[:4000]}")
-            if len(page.content) > 4000:
-                parts[-1] += "\n\n_(truncated)_"
-    # allow up to 50 pages of context
-    full = "\n\n---\n\n".join(parts[:50])
+    for page in relevant:
+        title = page.title
+        content = page.content[:max_chars_per_page]
+        parts.append(f"### {title}\n\n{content}")
+        if len(page.content) > max_chars_per_page:
+            parts[-1] += "\n\n_(truncated)_"
+
+    full = "\n\n---\n\n".join(parts)
     return full
 
 
@@ -184,7 +230,7 @@ def ingest_source(
 
     # 3. Call LLM
     client = get_llm_client()
-    existing = _collect_existing_pages()
+    existing = _collect_existing_pages(top_n=50, max_chars_per_page=3000)
 
     try:
         raw_json = client.ingest(
@@ -331,17 +377,8 @@ def query_wiki(
     """
     result = QueryResult(question=question, answer="")
 
-    # 1. Read index → locate relevant pages
-    idx = read_index()
-    titles = list(idx.keys()) if idx else list_pages()
-
-    # 2. Collect page contents
-    parts = []
-    for title in titles[:15]:  # limit context
-        page = read_page(title)
-        if page:
-            parts.append(f"### {title}\n\n{page.content[:1500]}")
-    wiki_text = "\n\n---\n\n".join(parts) if parts else "_(empty wiki)_"
+    # 1. Collect relevant pages (single pass, ranked by keyword relevance)
+    wiki_text = _collect_existing_pages(question=question, top_n=15, max_chars_per_page=1500)
 
     # 3. LLM
     client = get_llm_client()

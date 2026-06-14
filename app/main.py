@@ -86,7 +86,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # API — Wiki core
 # ============================================================================
 
-from api.wiki import ingest_source, query_wiki, lint_wiki  # noqa: E402
+from api.wiki import ingest_source, query_wiki, lint_wiki, _collect_existing_pages  # noqa: E402
 from core.llm import get_llm_client, QUERY_SYSTEM_PROMPT  # noqa: E402
 
 
@@ -238,49 +238,55 @@ async def api_create_raw(request: Request):
 @app.get("/api/raw/files")
 async def api_list_raw_files():
     """List all raw source files and generated wiki pages with their status."""
-    from core.wiki_io import scan_sources, list_pages, read_page
-    sources = scan_sources()
-    ingested_hashes = _get_ingested_hashes()
+    from core.wiki_io import list_pages_with_data, file_hash
 
-    # Raw source files
-    raw_files = []
-    for src in sources:
-        status = "pending"
-        prev_hash = ingested_hashes.get(src.path)
-        if prev_hash:
-            status = "ingested" if prev_hash == src.hash else "modified"
+    # 1. Read all wiki pages ONCE — build indexes in a single pass
+    pages = list_pages_with_data()
 
-        # Try to find associated wiki page (source_summary type)
-        wiki_pages = []
-        for title in list_pages():
-            page = read_page(title)
-            if page and page.frontmatter.get("page_type") == "source_summary":
-                page_sources = page.frontmatter.get("sources", [])
-                for s in page_sources:
-                    if isinstance(s, dict) and s.get("file") == src.path:
-                        wiki_pages.append(title)
-                        break
-
-        raw_files.append({
-            "path": src.path,
-            "hash": src.hash[:12],
-            "size": (_raw_root() / src.path).stat().st_size if (_raw_root() / src.path).exists() else 0,
-            "status": status,
-            "wiki_pages": wiki_pages,
-        })
-
-    # Generated wiki pages
+    ingested_hashes: dict[str, str] = {}
+    source_to_pages: dict[str, list[str]] = {}
     wiki_files = []
-    for title in list_pages():
-        page = read_page(title)
-        if page:
-            wiki_files.append({
-                "title": page.title,
-                "filename": page.filename,
-                "page_type": page.frontmatter.get("page_type", "concept"),
-                "status": page.frontmatter.get("status", "draft"),
-                "summary": page.frontmatter.get("summary", ""),
-                "size": len(page.full_markdown),
+
+    for page in pages:
+        wiki_files.append({
+            "title": page.title,
+            "filename": page.filename,
+            "page_type": page.frontmatter.get("page_type", "concept"),
+            "status": page.frontmatter.get("status", "draft"),
+            "summary": page.frontmatter.get("summary", ""),
+            "size": len(page.full_markdown),
+        })
+        if page.frontmatter.get("page_type") == "source_summary":
+            for s in page.frontmatter.get("sources", []):
+                if isinstance(s, dict) and "file" in s:
+                    sp = s["file"]
+                    if "hash" in s:
+                        ingested_hashes[sp] = s["hash"]
+                    source_to_pages.setdefault(sp, []).append(page.title)
+
+    # 2. Scan raw files — only compute content hash for ingested (modified-check) files
+    raw_root = _raw_root()
+    raw_files = []
+    if raw_root.exists():
+        for f in sorted(raw_root.rglob("*")):
+            if not f.is_file() or f.name.startswith("."):
+                continue
+            rel_path = str(f.relative_to(raw_root))
+            prev_hash = ingested_hashes.get(rel_path)
+
+            status = "pending"
+            hash_preview = ""
+            if prev_hash:
+                current_hash = file_hash(f)
+                status = "ingested" if current_hash == prev_hash else "modified"
+                hash_preview = current_hash[:12]
+
+            raw_files.append({
+                "path": rel_path,
+                "hash": hash_preview,
+                "size": f.stat().st_size,
+                "status": status,
+                "wiki_pages": source_to_pages.get(rel_path, []),
             })
 
     return {"raw_files": raw_files, "raw_count": len(raw_files),
@@ -406,10 +412,9 @@ async def api_read_wiki_file(name: str):
 
 def _get_ingested_hashes() -> dict[str, str]:
     """Read existing source hashes from wiki source_summary pages."""
-    from core.wiki_io import list_pages, read_page
+    from core.wiki_io import list_pages_with_data
     hashes: dict[str, str] = {}
-    for title in list_pages():
-        page = read_page(title)
+    for page in list_pages_with_data():
         if page and page.frontmatter.get("page_type") == "source_summary":
             sources = page.frontmatter.get("sources", [])
             for s in sources:
@@ -429,17 +434,56 @@ async def api_query(request: Request):
     return {"question": result.question, "answer": result.answer, "sources": result.sources, "written_back": result.written_back}
 
 
+def _sse_encode(text: str) -> str:
+    """Encode a text delta as a valid SSE 'data:' frame.
+
+    SSE requires every line in an event to be prefixed with ``data: ``.
+    If *text* contains internal newlines we emit one ``data: `` line per
+    logical line so that downstream SSE parsers see a single well-formed
+    event.
+    """
+    lines = text.split("\n")
+    return "\n".join(f"data: {line}" for line in lines) + "\n\n"
+
+
 @app.post("/api/wiki/query/stream")
 async def api_query_stream(request: Request):
-    """Stream query response via SSE (Server-Sent Events)."""
+    """Stream query response via SSE (Server-Sent Events).
+
+    Pages are ranked by keyword relevance to *question* before being sent
+    to the LLM, keeping context small and focused.
+    """
     from fastapi.responses import StreamingResponse
-    body = await request.json()
-    question = body.get("question", "")
+
+    # --- parse & validate request ----------------------------------------
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"error": "Invalid JSON body"}, status_code=400,
+        )
+
+    question = (body.get("question", "") or "").strip()
     if not question:
         return {"answer": "", "sources": []}
 
-    wiki_pages = _collect_existing_pages()
-    client = get_llm_client()
+    # --- collect wiki pages (with relevance ranking) ---------------------
+    try:
+        wiki_pages = _collect_existing_pages(
+            question=question, top_n=15, max_chars_per_page=2000,
+        )
+    except Exception as exc:
+        return JSONResponse(
+            {"error": f"Failed to read wiki pages: {exc}"}, status_code=500,
+        )
+
+    # --- build streaming response ----------------------------------------
+    try:
+        client = get_llm_client()
+    except Exception as exc:
+        return JSONResponse(
+            {"error": f"Failed to initialise LLM client: {exc}"}, status_code=500,
+        )
 
     async def generate():
         try:
@@ -452,10 +496,10 @@ async def api_query_stream(request: Request):
                 ],
                 task="query",
             ):
-                yield f"data: {chunk}\n\n"
+                yield _sse_encode(chunk)
             yield "data: [DONE]\n\n"
         except Exception as e:
-            yield f"data: [ERROR] {str(e)}\n\n"
+            yield _sse_encode(f"[ERROR] {str(e)}")
 
     return StreamingResponse(
         generate(),
@@ -529,7 +573,7 @@ async def api_lint_status(task_id: str):
 
 @app.get("/api/tasks")
 async def api_tasks_status():
-    """Return all background task statuses plus watcher info."""
+    """Return all background task statuses, watcher info, and system state."""
     tasks = []
     for task_id, task in _bg_tasks.items():
         tasks.append({
@@ -539,10 +583,36 @@ async def api_tasks_status():
             "type": task.get("type", "unknown"),
             "label": task.get("label", ""),
         })
-    # Add watcher status
+    # Watcher status
     from core.watcher import list_watched_folders
     watchers = list_watched_folders()
     active_watchers = [w for w in watchers if w.get("active")]
+
+    # Git status
+    git_info = {}
+    try:
+        from core.git import open_wiki_repo, current_branch, is_dirty
+        repo = open_wiki_repo()
+        git_info["branch"] = current_branch(repo)
+        git_info["dirty"] = is_dirty(repo)
+    except Exception:
+        git_info["branch"] = "—"
+        git_info["dirty"] = False
+
+    # Page count
+    from core.wiki_io import list_pages
+    page_count = len(list_pages())
+
+    # Active project
+    wb_data = {}
+    try:
+        import json
+        wb_file = Path("workbench.json")
+        if wb_file.exists():
+            wb_data = json.loads(wb_file.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+
     return {
         "tasks": tasks,
         "running": sum(1 for t in tasks if t["status"] == "running"),
@@ -553,6 +623,9 @@ async def api_tasks_status():
             "active": len(active_watchers),
             "folders": [w["folder"] for w in active_watchers],
         },
+        "git": git_info,
+        "page_count": page_count,
+        "project": wb_data.get("active") or BASE_DIR.name,
     }
 
 
@@ -730,8 +803,7 @@ async def api_watch_folders():
 @app.get("/api/watch/scan")
 async def api_watch_scan(folder: str = ""):
     """Scan a raw/ sub-folder and list all .md/.txt files with their status."""
-    from core.wiki_io import scan_sources
-    sources = scan_sources(folder=folder)
+    from core.wiki_io import file_hash
     ingested_hashes: dict[str, str] = {}
     # Reuse _get_ingested_hashes if available
     try:
@@ -740,18 +812,28 @@ async def api_watch_scan(folder: str = ""):
         pass
 
     files = []
-    for src in sources:
-        status = "pending"
-        prev_hash = ingested_hashes.get(src.path)
-        if prev_hash:
-            status = "ingested" if prev_hash == src.hash else "modified"
+    raw_root = _raw_root()
+    scan_dir = raw_root / folder if folder else raw_root
+    if scan_dir.exists():
+        for f in sorted(scan_dir.rglob("*")):
+            if not f.is_file() or f.name.startswith("."):
+                continue
+            rel_path = str(f.relative_to(raw_root))
+            prev_hash = ingested_hashes.get(rel_path)
 
-        files.append({
-            "path": src.path,
-            "hash": src.hash[:12],
-            "status": status,
-            "size": (_raw_root() / src.path).stat().st_size if (_raw_root() / src.path).exists() else 0,
-        })
+            status = "pending"
+            hash_preview = ""
+            if prev_hash:
+                current_hash = file_hash(f)
+                status = "ingested" if current_hash == prev_hash else "modified"
+                hash_preview = current_hash[:12]
+
+            files.append({
+                "path": rel_path,
+                "hash": hash_preview,
+                "status": status,
+                "size": f.stat().st_size,
+            })
 
     return {"folder": folder or "/", "files": files, "count": len(files)}
 

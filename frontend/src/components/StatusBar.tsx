@@ -19,11 +19,47 @@ interface TasksStatus {
     active: number
     folders: string[]
   }
+  git: {
+    branch: string
+    dirty: boolean
+  }
+  page_count: number
+  project: string
+}
+
+// VS Code status bar colors
+const BAR_BG = 'bg-[#007acc]'
+
+function StatusItem({ icon, label, title, onClick, pulse, dim }: {
+  icon?: string
+  label: string
+  title?: string
+  onClick?: () => void
+  pulse?: boolean
+  dim?: boolean
+}) {
+  return (
+    <span
+      title={title ?? label}
+      onClick={onClick}
+      className={`flex items-center gap-1 px-2 h-full cursor-pointer hover:bg-white/20 transition-colors ${onClick ? '' : 'cursor-default'} ${dim ? 'opacity-70' : ''}`}
+      role={onClick ? 'button' : undefined}
+    >
+      {pulse && (
+        <span className="relative flex h-2 w-2 mr-0.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/70" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+        </span>
+      )}
+      {icon && !pulse && <span className="text-xs leading-none">{icon}</span>}
+      <span>{label}</span>
+    </span>
+  )
 }
 
 export default function StatusBar() {
   const [status, setStatus] = useState<TasksStatus | null>(null)
-  const [visible, setVisible] = useState(false)
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null)
 
   useEffect(() => {
     let active = true
@@ -33,16 +69,9 @@ export default function StatusBar() {
         const data = await api.get<TasksStatus>('/api/tasks')
         if (!active) return
         setStatus(data)
-        // Keep visible if anything is running, or if there are active watchers
-        if (data.running > 0 || data.watchers.active > 0) {
-          setVisible(true)
-        } else if (data.tasks.length === 0 && data.watchers.active === 0) {
-          // Keep showing for a few seconds then hide
-          setVisible(false)
-        }
+        setBackendOnline(true)
       } catch {
-        // Backend not available or error — hide quietly
-        if (active) setVisible(false)
+        if (active) setBackendOnline(false)
       }
     }
 
@@ -58,54 +87,93 @@ export default function StatusBar() {
   const hasErrors = status && status.error > 0
   const runningTasks = status?.tasks.filter(t => t.status === 'running') ?? []
   const watchersActive = status?.watchers.active ?? 0
-
-  if (!visible) return null
+  const gitBranch = status?.git?.branch ?? '—'
+  const gitDirty = status?.git?.dirty ?? false
+  const pageCount = status?.page_count ?? 0
+  const project = status?.project ?? 'default'
 
   return (
-    <div className="flex items-center h-7 px-4 text-xs border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 gap-4 select-none">
-      {/* Running indicator */}
+    <div className={`flex items-center h-[22px] text-[12px] text-white ${BAR_BG} select-none shrink-0 font-sans`}>
+      {/* -- Left items -- */}
+
+      {/* Backend connection */}
+      {backendOnline === false && (
+        <StatusItem icon="⚠" label="Offline" title="Backend is not reachable" />
+      )}
+      {backendOnline === null && (
+        <StatusItem icon="⟳" label="Connecting..." title="Connecting to backend" />
+      )}
+      {backendOnline && !hasRunning && watchersActive === 0 && (
+        <StatusItem icon="✓" label="Ready" title="Backend is online" />
+      )}
+
+      {/* Running task */}
       {hasRunning && (
-        <div className="flex items-center gap-1.5">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-          </span>
-          <span className="font-medium text-blue-600 dark:text-blue-400">
-            {runningTasks.map(t => t.label || t.type).join(', ')}
-          </span>
-        </div>
+        <StatusItem
+          pulse
+          label={runningTasks.map(t => t.label || t.type).join(', ')}
+          title={runningTasks.map(t => `${t.label || t.type}: ${t.status}`).join('\n')}
+        />
+      )}
+
+      {/* Git branch */}
+      {backendOnline && (
+        <StatusItem
+          icon={gitDirty ? '⎇*' : '⎇'}
+          label={gitBranch}
+          title={gitDirty ? `Branch: ${gitBranch} (uncommitted changes)` : `Branch: ${gitBranch}`}
+          dim={gitDirty}
+        />
       )}
 
       {/* Watchers */}
       {watchersActive > 0 && (
-        <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-green-500" />
-          <span>Watching {status?.watchers.folders.join(', ') || `${watchersActive} folder(s)`}</span>
-        </div>
+        <StatusItem
+          icon="👁"
+          label={`Watching: ${status?.watchers.folders.join(', ') || `${watchersActive} folder(s)`}`}
+          title={`${watchersActive} active watcher(s)`}
+        />
       )}
 
-      {/* Errors */}
-      {hasErrors && (
-        <button
-          title={status?.tasks.filter(t => t.status === 'error').map(t => t.error).join('\n')}
-          className="flex items-center gap-1 text-red-500 hover:text-red-600"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-          </svg>
-          <span>{status?.error} error(s)</span>
-        </button>
+      {/* Project */}
+      {backendOnline && (
+        <StatusItem
+          icon="📁"
+          label={project}
+          title={`Project: ${project}`}
+        />
       )}
 
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Summary counts */}
+      {/* -- Right items -- */}
+
+      {/* Page count */}
+      {backendOnline && (
+        <StatusItem
+          icon="📄"
+          label={`${pageCount} pages`}
+          title={`${pageCount} wiki pages`}
+        />
+      )}
+
+      {/* Errors */}
+      {hasErrors && (
+        <StatusItem
+          icon="✗"
+          label={`${status?.error} error(s)`}
+          title={status?.tasks.filter(t => t.status === 'error').map(t => `${t.label || t.type}: ${t.error}`).join('\n')}
+        />
+      )}
+
+      {/* Task summary */}
       {status && status.tasks.length > 0 && (
-        <span className="text-gray-400 dark:text-gray-500">
-          Tasks: {status.running} running, {status.done} done
-          {status.error > 0 && <>, {status.error} failed</>}
-        </span>
+        <StatusItem
+          icon="📋"
+          label={`${status.running}r · ${status.done}d · ${status.error}e`}
+          title={`Running: ${status.running} | Done: ${status.done} | Failed: ${status.error}`}
+        />
       )}
     </div>
   )
