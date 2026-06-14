@@ -321,6 +321,128 @@ class RAGEngine:
         return HybridResult(answer=answer, wiki_sources=wiki_sources, rag_sources=rag_result.sources)
 
     # ------------------------------------------------------------------
+    # Streaming variants — yield text deltas, then a final metadata JSON line
+    # ------------------------------------------------------------------
+
+    def query_stream(self, question: str, top_k: int | None = None):
+        """RAG query with streaming LLM response.
+
+        Yields text delta strings.  The final yield is a JSON-encoded
+        metadata object containing ``sources`` so the caller can reconstruct
+        the full result without a second round-trip.
+        """
+        import json as _json
+        top_k = top_k or self.settings.rag_top_k
+        col = self._get_collection()
+        if not col or col.count() == 0:
+            yield "RAG index is empty. Build it first via /api/rag/index."
+            yield _json.dumps({"sources": []})
+            return
+
+        # --- vector / keyword search (same logic as query) ----------------
+        sources: list[dict] = []
+        context_parts: list[str] = []
+        try:
+            q_embedding = self._embed_texts([question])[0]
+            results = col.query(query_embeddings=[q_embedding],
+                                n_results=min(top_k, col.count()))
+            chunks_texts = results.get("documents", [[]])[0] or []
+            metadatas = results.get("metadatas", [[]])[0] or []
+            distances = results.get("distances", [[]])[0] or []
+
+            for i, (text, meta, dist) in enumerate(zip(chunks_texts, metadatas, distances)):
+                score = round(1.0 / (1.0 + dist), 4) if dist else 0.0
+                sources.append({
+                    "file": meta.get("file", "?"),
+                    "chunk_index": meta.get("chunk_idx", i),
+                    "score": score,
+                    "text": text[:300],
+                })
+                context_parts.append(f"[Source: {meta.get('file', '?')}]\n{text}")
+        except Exception:
+            kw_results = self._keyword_search(question, top_k)
+            for r in kw_results:
+                sources.append({
+                    "file": r["meta"].get("file", "?"),
+                    "chunk_index": r["meta"].get("chunk_idx", 0),
+                    "score": round(r["score"], 4),
+                    "text": r["text"][:300],
+                })
+                context_parts.append(f"[Source: {r['meta'].get('file', '?')}]\n{r['text']}")
+
+        context = "\n\n---\n\n".join(context_parts)
+        system = RAG_SYSTEM_PROMPT.format(context=context)
+
+        client = get_llm_client()
+        try:
+            for chunk in client.chat_completion_stream(
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": question},
+                ],
+                task="query",
+            ):
+                yield chunk
+        except Exception as e:
+            yield f"\n\nRAG query failed: {e}"
+
+        yield _json.dumps({"sources": sources})
+
+    def hybrid_query_stream(self, question: str, top_k: int | None = None):
+        """Hybrid query with streaming LLM response.
+
+        Yields text deltas.  The final yield is a JSON-encoded metadata
+        object containing ``wiki_sources`` and ``rag_sources``.
+        """
+        import json as _json
+        top_k = top_k or self.settings.rag_top_k
+
+        # Wiki query
+        wiki_answer = ""
+        wiki_sources: list[str] = []
+        try:
+            from api.wiki import query_wiki
+            wiki_result = query_wiki(question)
+            wiki_answer = wiki_result.answer
+            wiki_sources = wiki_result.sources
+        except Exception as e:
+            logger.warning("Wiki query failed in hybrid stream: %s", e)
+
+        # RAG search (non-streaming, we need sources for context)
+        rag_result = self.query(question, top_k)
+        rag_chunks = []
+        for s in rag_result.sources:
+            rag_chunks.append(f"[{s['file']}]\n{s['text']}")
+        rag_context = "\n\n---\n\n".join(rag_chunks)
+
+        if not wiki_answer and not rag_context:
+            yield "No results from either Wiki or RAG."
+            yield _json.dumps({"wiki_sources": wiki_sources,
+                               "rag_sources": rag_result.sources})
+            return
+
+        system = HYBRID_SYSTEM_PROMPT.format(
+            wiki_answer=wiki_answer or "(no wiki results)",
+            rag_context=rag_context or "(no rag results)",
+        )
+
+        client = get_llm_client()
+        try:
+            for chunk in client.chat_completion_stream(
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": question},
+                ],
+                task="query",
+            ):
+                yield chunk
+        except Exception as e:
+            yield f"\n\nHybrid query failed: {e}"
+
+        yield _json.dumps({"wiki_sources": wiki_sources,
+                           "rag_sources": rag_result.sources})
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 

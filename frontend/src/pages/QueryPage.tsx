@@ -1,36 +1,96 @@
-import { useState, FormEvent } from "react"
+import { useState, FormEvent, useEffect, useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { useSSE } from "../hooks/useSSE"
 import { api } from "../api/client"
+
 type Mode = "wiki" | "rag" | "hybrid"
+
+interface QueryHistoryItem {
+  q: string
+  a: string
+  mode: Mode
+  sources?: any[]
+}
+
+const STORAGE_KEYS = {
+  history: 'query_history',
+  mode: 'query_mode',
+} as const
+
+function loadHistory(): QueryHistoryItem[] {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEYS.history)
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return []
+}
+
+function loadMode(): Mode {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEYS.mode)
+    if (stored && ['wiki', 'rag', 'hybrid'].includes(stored)) return stored as Mode
+  } catch {}
+  return 'wiki'
+}
+
 export default function QueryPage() {
   const [q, setQ] = useState("")
-  const [mode, setMode] = useState<Mode>("wiki")
-  const [hist, setHist] = useState<any[]>([])
-  const sse = useSSE("/api/wiki/query/stream")
-  const [ra, setRa] = useState("")
-  const [rs, setRs] = useState<any[]>([])
-  const [rl, setRl] = useState(false)
+  const [mode, setMode] = useState<Mode>(loadMode)
+  const [hist, setHist] = useState<QueryHistoryItem[]>(loadHistory)
+
+  // Three SSE hooks – one per query mode
+  const wikiSSE = useSSE("/api/wiki/query/stream")
+  const ragSSE = useSSE("/api/rag/query/stream")
+  const hybridSSE = useSSE("/api/rag/query/hybrid/stream")
+
+  // Pick the active stream based on mode
+  const active = useMemo(() => {
+    if (mode === "wiki") return wikiSSE
+    if (mode === "rag") return ragSSE
+    return hybridSSE
+  }, [mode, wikiSSE, ragSSE, hybridSSE])
+
+  // Persist history and mode when they change
+  useEffect(() => {
+    try { sessionStorage.setItem(STORAGE_KEYS.history, JSON.stringify(hist.slice(0, 20))) } catch {}
+  }, [hist])
+
+  useEffect(() => {
+    try { sessionStorage.setItem(STORAGE_KEYS.mode, mode) } catch {}
+  }, [mode])
+
+  // When any SSE stream completes, write the final answer into history
+  useEffect(() => {
+    if (active.done && active.text && hist.length > 0 && !hist[0].a) {
+      const entry = hist[0]
+      const mergedSources = active.wikiSources.length > 0
+        ? [...active.wikiSources.map((s: string) => ({ file: s, chunk_index: 0, score: 0, text: "" })), ...active.sources]
+        : active.sources
+      setHist(p => [{ ...p[0], a: active.text, sources: mergedSources }, ...p.slice(1)])
+    }
+  }, [active.done, active.text])
+
   const handle = async (e: FormEvent) => {
     e.preventDefault(); if (!q.trim()) return
     const qq = q; setQ("")
-    if (mode === "wiki") { setHist(p => [{ q: qq, a: "", mode: "wiki" }, ...p]); sse.start({ question: qq }) }
-    else {
-      setRa(""); setRs([]); setRl(true)
-      try {
-        const ep = mode === "rag" ? "/api/rag/query" : "/api/rag/query/hybrid"
-        const r = await api.post<any>(ep, { question: qq, top_k: 5 })
-        setRa(r.answer); setRs(r.sources || r.rag_sources || [])
-        setHist(p => [{ q: qq, a: r.answer, mode, sources: r.sources || r.rag_sources }, ...p])
-      } catch (e: any) { setRa("Error: " + (e.message || "failed")) }
-      finally { setRl(false) }
+    // Push a placeholder entry immediately so the user sees it
+    setHist(p => [{ q: qq, a: "", mode }, ...p])
+    // Start the stream for the current mode
+    if (mode === "wiki") {
+      wikiSSE.start({ question: qq })
+    } else if (mode === "rag") {
+      ragSSE.start({ question: qq, top_k: 5 })
+    } else {
+      hybridSSE.start({ question: qq, top_k: 5 })
     }
   }
-  const cur = mode === "wiki" ? sse.text : ra
-  const curSrc = mode === "wiki" ? [] : rs
-  const loading = mode === "wiki" ? (!sse.done && !!sse.text) : rl
+
+  const cur = active.text
+  const curSrc = active.sources
+  const loading = !active.done && !!active.text
   const modes = [{ k: "wiki" as Mode, l: "Wiki" }, { k: "rag" as Mode, l: "RAG" }, { k: "hybrid" as Mode, l: "Hybrid" }]
+
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold mb-4">Ask the Wiki</h1>
@@ -47,7 +107,7 @@ export default function QueryPage() {
         <button type="submit" disabled={!q.trim() || loading}
           className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded-lg text-sm font-semibold">Send</button>
       </form>
-      {sse.error && <div className="text-red-500 dark:text-red-400 text-sm mb-4">Error: {sse.error}</div>}
+      {active.error && <div className="text-red-500 dark:text-red-400 text-sm mb-4">Error: {active.error}</div>}
       {cur && (
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-6">
           <div className="prose prose-sm dark:prose-invert max-w-none">

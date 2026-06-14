@@ -76,20 +76,20 @@ export default function LintPage() {
     try {
       const res = await api.post<{ task_id: string }>('/api/wiki/lint', { async: true, auto_fix: autoFix })
       const taskId = res.task_id
-      sessionStorage.setItem('lint_pending_task', JSON.stringify({ taskId, autoFix }))
+      sessionStorage.setItem(STORAGE_KEYS.pendingTask, JSON.stringify({ taskId, autoFix }))
       const poll = setInterval(async () => {
         try {
           const status = await api.get<{ status: string; result?: LintReport; error?: string }>(`/api/wiki/lint/status/${taskId}`)
           if (status.status === 'done' && status.result) {
             clearInterval(poll)
-            sessionStorage.removeItem('lint_pending_task')
-            sessionStorage.setItem('lint_last_result', JSON.stringify(status.result))
+            sessionStorage.removeItem(STORAGE_KEYS.pendingTask)
+            sessionStorage.setItem(STORAGE_KEYS.lastResult, JSON.stringify(status.result))
             setReport(status.result)
             setRunning(false)
             window.dispatchEvent(new CustomEvent('lint-done', { detail: status.result }))
           } else if (status.status === 'error') {
             clearInterval(poll)
-            sessionStorage.removeItem('lint_pending_task')
+            sessionStorage.removeItem(STORAGE_KEYS.pendingTask)
             setError(status.error || 'Lint failed')
             setRunning(false)
           }

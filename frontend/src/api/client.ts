@@ -40,5 +40,6 @@ export const api = {
     query: (q: string, k = 5) => request<any>("/api/rag/query", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, top_k: k }) }),
     hybrid: (q: string, k = 5) => request<any>("/api/rag/query/hybrid", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, top_k: k }) }),
     queryStream: (q: string, k = 5) => fetch(BASE + "/api/rag/query/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, top_k: k }) }),
+    hybridStream: (q: string, k = 5) => fetch(BASE + "/api/rag/query/hybrid/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, top_k: k }) }),
   },
 }
