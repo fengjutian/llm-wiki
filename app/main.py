@@ -488,7 +488,7 @@ async def api_lint(request: Request):
 
     # Async mode: start background task
     task_id = uuid.uuid4().hex[:12]
-    _bg_tasks[task_id] = {"status": "running", "result": None, "error": None}
+    _bg_tasks[task_id] = {"status": "running", "result": None, "error": None, "type": "lint", "label": "Lint health check"}
 
     async def _run():
         try:
@@ -498,6 +498,8 @@ async def api_lint(request: Request):
             report = await loop.run_in_executor(None, fn)
             _bg_tasks[task_id] = {
                 "status": "done",
+                "type": "lint",
+                "label": "Lint health check",
                 "result": {
                     "health_score": report.health_score,
                     "issues": [{"severity": i.severity, "type": i.type, "description": i.description,
@@ -509,7 +511,7 @@ async def api_lint(request: Request):
             }
         except Exception as exc:
             logger.exception("Background lint failed")
-            _bg_tasks[task_id] = {"status": "error", "result": None, "error": str(exc)}
+            _bg_tasks[task_id] = {"status": "error", "type": "lint", "label": "Lint health check", "result": None, "error": str(exc)}
 
     asyncio.create_task(_run())
     return {"task_id": task_id, "status": "started"}
@@ -523,6 +525,35 @@ async def api_lint_status(task_id: str):
         return JSONResponse({"error": "task not found"}, status_code=404)
     return {"task_id": task_id, "status": task["status"],
             "result": task.get("result"), "error": task.get("error")}
+
+
+@app.get("/api/tasks")
+async def api_tasks_status():
+    """Return all background task statuses plus watcher info."""
+    tasks = []
+    for task_id, task in _bg_tasks.items():
+        tasks.append({
+            "task_id": task_id,
+            "status": task["status"],
+            "error": task.get("error"),
+            "type": task.get("type", "unknown"),
+            "label": task.get("label", ""),
+        })
+    # Add watcher status
+    from core.watcher import list_watched_folders
+    watchers = list_watched_folders()
+    active_watchers = [w for w in watchers if w.get("active")]
+    return {
+        "tasks": tasks,
+        "running": sum(1 for t in tasks if t["status"] == "running"),
+        "done": sum(1 for t in tasks if t["status"] == "done"),
+        "error": sum(1 for t in tasks if t["status"] == "error"),
+        "watchers": {
+            "total": len(watchers),
+            "active": len(active_watchers),
+            "folders": [w["folder"] for w in active_watchers],
+        },
+    }
 
 
 @app.get("/api/wiki/pages")

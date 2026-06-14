@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
+import StatusBar from './StatusBar'
 import Toast from './Toast'
 import TopBar from './TopBar'
 import { useElectronMenu } from '../hooks/useElectronMenu'
@@ -18,6 +19,7 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      <StatusBar />
       <Toast />
     </div>
   )
