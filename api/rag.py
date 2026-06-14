@@ -31,7 +31,10 @@ async def rag_status():
 @router.post("/index")
 async def rag_index(req: IndexRequest):
     try:
-        return _get_engine().index_documents(req.folder, req.force)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, _get_engine().index_documents, req.folder, req.force
+        )
     except ImportError:
         return {"error": "RAG not available"}
 

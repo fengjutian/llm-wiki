@@ -228,7 +228,8 @@ async def api_create_raw(request: Request):
     if dest.exists():
         return JSONResponse({"error": f"文件已存在: {safe_name}"}, status_code=409)
 
-    dest.write_text(content, encoding="utf-8")
+    async with aiofiles.open(dest, "w", encoding="utf-8") as f:
+        await f.write(content)
     rel_path = str(dest.relative_to(settings.raw_root))
     logger.info("Created raw file: %s (%d bytes)", rel_path, len(content))
     return {"filename": rel_path, "size": len(content), "status": "created"}
@@ -317,7 +318,8 @@ async def api_read_raw_file(filename: str):
             status_code=404,
         )
     try:
-        content = fp.read_text(encoding="utf-8")
+        async with aiofiles.open(fp, "r", encoding="utf-8") as f:
+            content = await f.read()
         return {"filename": filename, "content": content, "size": len(content)}
     except Exception as exc:
         return JSONResponse({"error": "read failed: " + str(exc), "filename": filename}, status_code=500)
@@ -363,7 +365,8 @@ async def api_update_raw_file(filename: str, request: Request):
     try:
         body = await request.json()
         new_content = body.get("content", "")
-        fp.write_text(new_content, encoding="utf-8")
+        async with aiofiles.open(fp, "w", encoding="utf-8") as f:
+            await f.write(new_content)
         new_size = fp.stat().st_size
         logger.info("Updated raw file: %s (%d bytes)", filename, new_size)
         return {"filename": filename, "status": "updated", "size": new_size}
