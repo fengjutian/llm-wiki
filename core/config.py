@@ -141,12 +141,20 @@ def load_user_config() -> dict:
 def save_user_config(data: dict) -> None:
     """Persist user configuration to settings.json (whitelisted keys only).
 
-    Clears both the settings cache AND the LLM client cache so new credentials
-    take effect immediately.
+    Merges with existing config so keys not present in the incoming data are
+    preserved. Clears both the settings cache AND the LLM client cache so new
+    credentials take effect immediately.
     """
     import json
-    filtered = {k: v for k, v in data.items() if k in _USER_CONFIG_KEYS and v}
-    SETTINGS_FILE.write_text(json.dumps(filtered, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Merge with existing config: incoming values take priority, missing keys preserved
+    merged = load_user_config()
+    for k, v in data.items():
+        if k in _USER_CONFIG_KEYS:
+            if v:
+                merged[k] = v
+            else:
+                merged.pop(k, None)  # explicit empty = remove key
+    SETTINGS_FILE.write_text(json.dumps(merged, indent=2, ensure_ascii=False), encoding="utf-8")
     get_settings.cache_clear()
 
     # also force-recreate the LLM client so it picks up the new API key

@@ -690,6 +690,13 @@ async def api_get_log(last_n: int = 20):
 # Config API
 # ============================================================================
 
+def _mask_key(key: str) -> str:
+    """Mask an API key for safe display (show first 8 chars + ***)."""
+    if not key:
+        return ""
+    return key[:8] + "***"
+
+
 @app.get("/api/config")
 async def api_get_config():
     """Return current LLM configuration (API key masked)."""
@@ -698,9 +705,10 @@ async def api_get_config():
     return {
         "llm_api_base": s.llm_api_base,
         "llm_model": s.llm_model,
-        "llm_api_key": s.llm_api_key[:8] + "***" if s.llm_api_key else "",
+        "llm_api_key": _mask_key(s.llm_api_key),
         "llm_small_model": s.llm_small_model or s.llm_model,
-        "llm_small_api_base": s.resolved_small_api_base,
+        "llm_small_api_base": s.llm_small_api_base,  # raw value, not resolved
+        "llm_small_api_key": _mask_key(s.llm_small_api_key),
         "llm_max_tokens": s.llm_max_tokens,
         "llm_temperature": s.llm_temperature,
         "has_key": bool(s.llm_api_key),

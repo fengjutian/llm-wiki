@@ -6,6 +6,32 @@ type FilterKey = 'all' | 'critical' | 'warning' | 'info'
 type GroupKey = 'severity' | 'type' | 'none'
 type SortKey = 'severity' | 'type' | 'pages'
 
+const STORAGE_KEYS = {
+  lastResult: 'lint_last_result',
+  pendingTask: 'lint_pending_task',
+  preferences: 'lint_preferences',
+} as const
+
+interface LintPreferences {
+  autoFix: boolean
+  filter: FilterKey
+  groupBy: GroupKey
+  sortBy: SortKey
+  search: string
+}
+
+function loadPreferences(): LintPreferences {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEYS.preferences)
+    if (stored) return JSON.parse(stored)
+  } catch {}
+  return { autoFix: false, filter: 'all', groupBy: 'severity', sortBy: 'severity', search: '' }
+}
+
+function savePreferences(prefs: LintPreferences) {
+  try { sessionStorage.setItem(STORAGE_KEYS.preferences, JSON.stringify(prefs)) } catch {}
+}
+
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 }
 const SEVERITY_META: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
   critical: { label: '严重', color: 'text-red-600 dark:text-red-400',     bg: 'bg-red-50 dark:bg-red-950/30',     border: 'border-red-300 dark:border-red-800',     dot: 'bg-red-500' },
@@ -21,22 +47,29 @@ const SCORE_META: Record<string, { label: string; color: string; ring: string; g
 }
 
 export default function LintPage() {
+  const savedPrefs = loadPreferences()
   const [report, setReport] = useState<LintReport | null>(null)
   const [running, setRunning] = useState(false)
-  const [autoFix, setAutoFix] = useState(false)
+  const [autoFix, setAutoFix] = useState(savedPrefs.autoFix)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState<FilterKey>('all')
-  const [groupBy, setGroupBy] = useState<GroupKey>('severity')
-  const [sortBy, setSortBy] = useState<SortKey>('severity')
-  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<FilterKey>(savedPrefs.filter)
+  const [groupBy, setGroupBy] = useState<GroupKey>(savedPrefs.groupBy)
+  const [sortBy, setSortBy] = useState<SortKey>(savedPrefs.sortBy)
+  const [search, setSearch] = useState(savedPrefs.search)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
 
+  // Restore last lint result
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem('lint_last_result')
+      const stored = sessionStorage.getItem(STORAGE_KEYS.lastResult)
       if (stored) setReport(JSON.parse(stored))
     } catch {}
   }, [])
+
+  // Persist preferences when they change
+  useEffect(() => {
+    savePreferences({ autoFix, filter, groupBy, sortBy, search })
+  }, [autoFix, filter, groupBy, sortBy, search])
 
   const runLint = async () => {
     setRunning(true); setError(''); setSelectedIdx(null)
