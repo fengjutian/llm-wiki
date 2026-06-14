@@ -20,7 +20,7 @@ const STORAGE_KEYS = {
 
 function loadHistory(): QueryHistoryItem[] {
   try {
-    const stored = sessionStorage.getItem(STORAGE_KEYS.history)
+    const stored = localStorage.getItem(STORAGE_KEYS.history)
     if (stored) return JSON.parse(stored)
   } catch {}
   return []
@@ -28,7 +28,7 @@ function loadHistory(): QueryHistoryItem[] {
 
 function loadMode(): Mode {
   try {
-    const stored = sessionStorage.getItem(STORAGE_KEYS.mode)
+    const stored = localStorage.getItem(STORAGE_KEYS.mode)
     if (stored && ['wiki', 'rag', 'hybrid'].includes(stored)) return stored as Mode
   } catch {}
   return 'wiki'
@@ -53,11 +53,11 @@ export default function QueryPage() {
 
   // Persist history and mode when they change
   useEffect(() => {
-    try { sessionStorage.setItem(STORAGE_KEYS.history, JSON.stringify(hist.slice(0, 20))) } catch {}
+    try { localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(hist.slice(0, 20))) } catch {}
   }, [hist])
 
   useEffect(() => {
-    try { sessionStorage.setItem(STORAGE_KEYS.mode, mode) } catch {}
+    try { localStorage.setItem(STORAGE_KEYS.mode, mode) } catch {}
   }, [mode])
 
   // When any SSE stream completes, write the final answer into history

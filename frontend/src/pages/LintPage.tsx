@@ -22,14 +22,14 @@ interface LintPreferences {
 
 function loadPreferences(): LintPreferences {
   try {
-    const stored = sessionStorage.getItem(STORAGE_KEYS.preferences)
+    const stored = localStorage.getItem(STORAGE_KEYS.preferences)
     if (stored) return JSON.parse(stored)
   } catch {}
   return { autoFix: false, filter: 'all', groupBy: 'severity', sortBy: 'severity', search: '' }
 }
 
 function savePreferences(prefs: LintPreferences) {
-  try { sessionStorage.setItem(STORAGE_KEYS.preferences, JSON.stringify(prefs)) } catch {}
+  try { localStorage.setItem(STORAGE_KEYS.preferences, JSON.stringify(prefs)) } catch {}
 }
 
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 }
@@ -61,7 +61,7 @@ export default function LintPage() {
   // Restore last lint result
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem(STORAGE_KEYS.lastResult)
+      const stored = localStorage.getItem(STORAGE_KEYS.lastResult)
       if (stored) setReport(JSON.parse(stored))
     } catch {}
   }, [])
@@ -76,20 +76,20 @@ export default function LintPage() {
     try {
       const res = await api.post<{ task_id: string }>('/api/wiki/lint', { async: true, auto_fix: autoFix })
       const taskId = res.task_id
-      sessionStorage.setItem(STORAGE_KEYS.pendingTask, JSON.stringify({ taskId, autoFix }))
+      localStorage.setItem(STORAGE_KEYS.pendingTask, JSON.stringify({ taskId, autoFix }))
       const poll = setInterval(async () => {
         try {
           const status = await api.get<{ status: string; result?: LintReport; error?: string }>(`/api/wiki/lint/status/${taskId}`)
           if (status.status === 'done' && status.result) {
             clearInterval(poll)
-            sessionStorage.removeItem(STORAGE_KEYS.pendingTask)
-            sessionStorage.setItem(STORAGE_KEYS.lastResult, JSON.stringify(status.result))
+            localStorage.removeItem(STORAGE_KEYS.pendingTask)
+            localStorage.setItem(STORAGE_KEYS.lastResult, JSON.stringify(status.result))
             setReport(status.result)
             setRunning(false)
             window.dispatchEvent(new CustomEvent('lint-done', { detail: status.result }))
           } else if (status.status === 'error') {
             clearInterval(poll)
-            sessionStorage.removeItem(STORAGE_KEYS.pendingTask)
+            localStorage.removeItem(STORAGE_KEYS.pendingTask)
             setError(status.error || 'Lint failed')
             setRunning(false)
           }

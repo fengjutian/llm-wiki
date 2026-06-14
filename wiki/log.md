@@ -1234,3 +1234,43 @@ Top issues:
   [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
   [warning] orphan: Page '2026-05-15 Source: promotion 与 promotion code 两张表' has no incoming links
 
+## [2026-06-14 11:21] lint | Health check | branch: main
+Score: C | Critical: 0 | Warnings: 36 | Info: 0
+Wiki size: 95 pages, 217 links
+Auto-fix: no
+Issue types: orphan: 35, source_integrity: 1
+Top issues:
+  [warning] orphan: Page '2025-05-20_1035 Vue Component Refactor Copy Mode Fix' has no incoming links
+  [warning] orphan: Page '2026-01-06 Source: Promotion Copy Code Duplicate Bug' has no incoming links
+  [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
+  [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
+  [warning] orphan: Page '2026-05-15 Source: promotion 与 promotion code 两张表' has no incoming links
+
+## [2026-06-14 11:28] lint | Health check | branch: main
+Score: C | Critical: 0 | Warnings: 36 | Info: 0
+Wiki size: 95 pages, 217 links
+Auto-fix: no
+Issue types: orphan: 35, source_integrity: 1
+Top issues:
+  [warning] orphan: Page '2025-05-20_1035 Vue Component Refactor Copy Mode Fix' has no incoming links
+  [warning] orphan: Page '2026-01-06 Source: Promotion Copy Code Duplicate Bug' has no incoming links
+  [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
+  [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
+  [warning] orphan: Page '2026-05-15 Source: promotion 与 promotion code 两张表' has no incoming links
+
+## [2026-06-14 11:28] lint | Health check | branch: main
+Score: C | Critical: 0 | Warnings: 36 | Info: 0
+Wiki size: 95 pages, 217 links
+Auto-fix: no
+Issue types: orphan: 35, source_integrity: 1
+Top issues:
+  [warning] orphan: Page '2025-05-20_1035 Vue Component Refactor Copy Mode Fix' has no incoming links
+  [warning] orphan: Page '2026-01-06 Source: Promotion Copy Code Duplicate Bug' has no incoming links
+  [warning] orphan: Page '2026-05-13 Source: Promotion 列表导出 CSV 功能实现' has no incoming links
+  [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
+  [warning] orphan: Page '2026-05-15 Source: promotion 与 promotion code 两张表' has no incoming links
+
+## [2026-06-14 11:43] ingest | nonexistent.md | branch: main
+Status: failed
+Error: Source file not found
+

@@ -460,13 +460,54 @@ class RAGEngine:
         client = get_llm_client()
         model = self._get_embedding_model()
 
-        # Use OpenAI-compatible embeddings endpoint
-        openai_client = client.primary if client.primary else client.small
+        # Empty model means the provider does not support embeddings.
+        # Raise immediately so the caller falls back to ChromaDB ONNX.
+        if not model:
+            raise RuntimeError("No embedding model configured for this provider")
+
+        # Some providers (MiniMax) use a non-OpenAI-compatible /v1/embeddings
+        # format that the openai SDK cannot parse.  Detect and handle those
+        # with a raw HTTP request.
+        base = self.settings.resolved_small_api_base.lower()
+        key = self.settings.resolved_small_api_key
+
+        if "minimax" in base or "minimaxi" in base:
+            return self._embed_via_minimax(texts, model, base, key)
+
+        # OpenAI-compatible path
+        openai_client = client.small if client.small else client.primary
+        if not openai_client:
+            raise RuntimeError("No LLM client available for embeddings")
         try:
             resp = openai_client.embeddings.create(model=model, input=texts)
             return [d.embedding for d in resp.data]
         except Exception as e:
             logger.error("Embedding failed with model %s: %s", model, e)
+            raise
+
+    def _embed_via_minimax(
+        self, texts: list[str], model: str, base: str, key: str
+    ) -> list[list[float]]:
+        """Call MiniMax /v1/embeddings which uses a non-OpenAI request/response
+        shape (``texts`` instead of ``input``; ``vectors`` instead of
+        ``data[].embedding``)."""
+        import requests as _requests
+        url = f"{base.rstrip('/')}/embeddings"
+        payload = {"model": model, "texts": texts, "type": "db"}
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        }
+        try:
+            resp = _requests.post(url, json=payload, headers=headers, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            vectors = data.get("vectors")
+            if not vectors:
+                raise RuntimeError(f"MiniMax embeddings returned no vectors: {data}")
+            return vectors
+        except Exception as e:
+            logger.error("MiniMax embedding failed: %s", e)
             raise
 
     def _get_embedding_model(self) -> str:
@@ -476,12 +517,17 @@ class RAGEngine:
         if configured:
             self._embedding_model = configured
             return configured
-        # Auto-detect from base URL
-        base = self.settings.llm_api_base.lower()
-        if "deepseek" in base:
-            self._embedding_model = "deepseek-chat"  # DeepSeek's chat model supports embeddings too
-        else:
+        # Return the appropriate embedding model name for the configured
+        # small-model provider.  _embed_texts dispatches to the correct
+        # HTTP path (OpenAI SDK vs raw request) based on the provider.
+        # Empty string = ChromaDB ONNX fallback for unsupported providers.
+        base = self.settings.resolved_small_api_base.lower()
+        if "openai.com" in base or base.startswith("http://localhost") or base.startswith("http://127.0.0.1"):
             self._embedding_model = "text-embedding-3-small"
+        elif "minimax" in base or "minimaxi" in base:
+            self._embedding_model = "embo-01"
+        else:
+            self._embedding_model = ""  # ChromaDB ONNX fallback
         return self._embedding_model
 
     def _get_or_create_collection(self, reset: bool = False):
