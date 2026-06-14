@@ -61,6 +61,13 @@ export default function RawFilesPage() {
   const [modalLoading, setModalLoading] = useState(false)
   const [modalTitle, setModalTitle] = useState('')
 
+  // New document state
+  const [showNewRawForm, setShowNewRawForm] = useState(false)
+  const [showNewWikiForm, setShowNewWikiForm] = useState(false)
+  const [newDocName, setNewDocName] = useState('')
+  const [newDocFolder, setNewDocFolder] = useState('')
+  const [newDocContent, setNewDocContent] = useState('')
+
   useEffect(() => { loadFiles() }, [])
 
   const loadFiles = () => {
@@ -152,6 +159,33 @@ export default function RawFilesPage() {
     } catch {
       addToast(`Failed to delete: ${path}`)
     }
+  }
+
+  const newRawFile = async () => {
+    const name = newDocName.trim()
+    if (!name) { addToast('Please enter a filename'); return }
+    try {
+      await api.post<{filename: string; status: string}>('/api/raw/create', {
+        filename: name, content: newDocContent, folder: newDocFolder.trim(),
+      })
+      addToast(`Created: ${newDocFolder ? newDocFolder + '/' : ''}${name}`)
+      setShowNewRawForm(false); setNewDocName(''); setNewDocFolder(''); setNewDocContent('')
+      loadFiles()
+    } catch { addToast(`Failed to create: ${name}`) }
+  }
+
+  const newWikiPage = async () => {
+    const name = newDocName.trim()
+    if (!name) { addToast('Please enter a page title'); return }
+    try {
+      const fm = '---\ntitle: "' + name + '"\npage_type: concept\nstatus: draft\nsummary: ""\n---\n\n'
+      await api.put<{status: string}>('/api/wiki/pages/' + encodeURIComponent(name), {
+        content: fm + newDocContent,
+      })
+      addToast(`Created wiki page: ${name}`)
+      setShowNewWikiForm(false); setNewDocName(''); setNewDocFolder(''); setNewDocContent('')
+      loadFiles()
+    } catch { addToast(`Failed to create: ${name}`) }
   }
 
   // --- Wiki file actions ---
@@ -259,21 +293,48 @@ export default function RawFilesPage() {
             Raw 源文件
             <span className="text-base font-normal text-gray-400 dark:text-gray-500">({rawFiles.length})</span>
           </h1>
-          {selected.size > 0 && (
-            <button onClick={ingestSelected}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg text-sm font-semibold text-white shadow-md shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all duration-200">
-              <span>🤖</span> Ingest {selected.size} selected
+          <div className="flex items-center gap-2">
+            <button onClick={() => { setShowNewRawForm(!showNewRawForm); setShowNewWikiForm(false); setNewDocFolder(''); setNewDocContent('') }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors">
+              <span>➕</span> New Raw File
             </button>
-          )}
+            {selected.size > 0 && (
+              <button onClick={ingestSelected}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg text-sm font-semibold text-white shadow-md shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all duration-200">
+                <span>🤖</span> Ingest {selected.size} selected
+              </button>
+            )}
+          </div>
         </div>
 
-        {rawFiles.length === 0 ? (
+        {/* New Raw File inline form */}
+        {showNewRawForm && (
+          <div className="bg-white dark:bg-gray-900 border border-cyan-200 dark:border-cyan-800 rounded-xl p-4 mb-4 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Create New Raw Source File</h3>
+            <div className="flex gap-2">
+              <input value={newDocFolder} onChange={e => setNewDocFolder(e.target.value)}
+                placeholder="Folder (e.g. drafts/)" className="w-1/3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:border-cyan-500" />
+              <input value={newDocName} onChange={e => setNewDocName(e.target.value)}
+                placeholder="Filename (e.g. notes.md)" className="flex-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:border-cyan-500" />
+            </div>
+            <textarea value={newDocContent} onChange={e => setNewDocContent(e.target.value)}
+              placeholder="Initial content (optional markdown)..."
+              rows={4}
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:border-cyan-500 font-mono" />
+            <div className="flex gap-2">
+              <button onClick={newRawFile} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-semibold transition-colors">Create</button>
+              <button onClick={() => setShowNewRawForm(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {rawFiles.length === 0 && !showNewRawForm ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
             <span className="text-5xl mb-4">📭</span>
             <p className="text-sm font-medium mb-1">暂无源文件</p>
-            <p className="text-xs">请通过 Ingest 页面上传源文档</p>
+            <p className="text-xs">请通过 Ingest 页面上传源文档，或点击 "New Raw File" 新建</p>
           </div>
-        ) : (
+        ) : rawFiles.length === 0 && showNewRawForm ? null : (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -368,13 +429,44 @@ export default function RawFilesPage() {
       </div>
 
       {/* Generated wiki pages section */}
-      {wikiFiles.length > 0 && (
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-3 mb-4">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold flex items-center gap-3">
             <span className="text-2xl">📝</span>
             已生成 Wiki 页面
             <span className="text-base font-normal text-gray-400 dark:text-gray-500">({wikiFiles.length})</span>
           </h2>
+          <button onClick={() => { setShowNewWikiForm(!showNewWikiForm); setShowNewRawForm(false); setNewDocFolder(''); setNewDocContent('') }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors">
+            <span>➕</span> New Wiki Page
+          </button>
+        </div>
+
+        {/* New Wiki Page inline form */}
+        {showNewWikiForm && (
+          <div className="bg-white dark:bg-gray-900 border border-purple-200 dark:border-purple-800 rounded-xl p-4 mb-4 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Create New Wiki Page</h3>
+            <input value={newDocName} onChange={e => setNewDocName(e.target.value)}
+              placeholder="Page title (e.g. My Topic)"
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:border-cyan-500" />
+            <textarea value={newDocContent} onChange={e => setNewDocContent(e.target.value)}
+              placeholder="Markdown body (frontmatter will be auto-generated)..."
+              rows={5}
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:border-cyan-500 font-mono" />
+            <div className="flex gap-2">
+              <button onClick={newWikiPage} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-semibold transition-colors">Create</button>
+              <button onClick={() => setShowNewWikiForm(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {wikiFiles.length === 0 && !showNewWikiForm ? (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl">
+            <span className="text-4xl mb-3">📝</span>
+            <p className="text-sm font-medium mb-1">暂无 Wiki 页面</p>
+            <p className="text-xs">Ingest source files to generate pages, or click "New Wiki Page" to create one manually.</p>
+          </div>
+        ) : wikiFiles.length === 0 && showNewWikiForm ? null : (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -444,8 +536,8 @@ export default function RawFilesPage() {
               </tbody>
             </table>
           </div>
-        </div>
       )}
+      </div>
 
       {/* View / Edit Modal */}
       {modal && (

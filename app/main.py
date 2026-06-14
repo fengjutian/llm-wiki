@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 import aiofiles
@@ -151,8 +151,8 @@ async def api_ingest_folder(request: Request):
 
 
 @app.post("/api/raw/upload")
-async def api_upload_raw(file: UploadFile = File(...)):
-    """Upload a file to the raw/ directory."""
+async def api_upload_raw(file: UploadFile = File(...), folder: str = Form("")):
+    """Upload a file to the raw/ directory, optionally into a sub-folder."""
     # Validate filename
     if not file.filename or not file.filename.strip():
         return JSONResponse(
@@ -168,13 +168,70 @@ async def api_upload_raw(file: UploadFile = File(...)):
         )
 
     settings = get_settings()
-    settings.raw_root.mkdir(parents=True, exist_ok=True)
-    dest = settings.raw_root / safe_name
+    # Sanitize folder to prevent traversal
+    folder = folder.strip().strip("/").strip("\\")
+    if folder:
+        safe_folder = Path(folder)
+        try:
+            settings.raw_root.joinpath(safe_folder).resolve().relative_to(settings.raw_root.resolve())
+        except ValueError:
+            return JSONResponse(
+                {"error": f"无效的文件夹路径: {folder!r}"},
+                status_code=400,
+            )
+        dest_dir = settings.raw_root / safe_folder
+    else:
+        dest_dir = settings.raw_root
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / safe_name
     content = await file.read()
     async with aiofiles.open(dest, "wb") as f:
         await f.write(content)
-    logger.info("Uploaded raw file: %s (%d bytes)", safe_name, len(content))
-    return {"filename": safe_name, "size": len(content), "status": "uploaded"}
+    rel_path = str(dest.relative_to(settings.raw_root))
+    logger.info("Uploaded raw file: %s (%d bytes)", rel_path, len(content))
+    return {"filename": rel_path, "size": len(content), "status": "uploaded"}
+
+
+@app.post("/api/raw/create")
+async def api_create_raw(request: Request):
+    """Create a new raw source file, optionally in a sub-folder.
+
+    Body: { "filename": "new-doc.md", "content": "...", "folder": "drafts/" }
+    """
+    body = await request.json()
+    filename = (body.get("filename") or body.get("name") or "").strip()
+    if not filename:
+        return JSONResponse({"error": "文件名不能为空"}, status_code=400)
+
+    # Sanitize: prevent directory traversal in filename
+    safe_name = Path(filename).name
+    if not safe_name or safe_name in (".", ".."):
+        return JSONResponse({"error": f"无效的文件名: {filename!r}"}, status_code=400)
+
+    content = body.get("content", "")
+
+    settings = get_settings()
+    folder = (body.get("folder") or "").strip().strip("/").strip("\\")
+    if folder:
+        safe_folder = Path(folder)
+        try:
+            settings.raw_root.joinpath(safe_folder).resolve().relative_to(settings.raw_root.resolve())
+        except ValueError:
+            return JSONResponse({"error": f"无效的文件夹路径: {folder!r}"}, status_code=400)
+        dest_dir = settings.raw_root / safe_folder
+    else:
+        dest_dir = settings.raw_root
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / safe_name
+    if dest.exists():
+        return JSONResponse({"error": f"文件已存在: {safe_name}"}, status_code=409)
+
+    dest.write_text(content, encoding="utf-8")
+    rel_path = str(dest.relative_to(settings.raw_root))
+    logger.info("Created raw file: %s (%d bytes)", rel_path, len(content))
+    return {"filename": rel_path, "size": len(content), "status": "created"}
 
 
 @app.get("/api/raw/files")

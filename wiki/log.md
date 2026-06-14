@@ -954,3 +954,7 @@ Top issues:
   [warning] orphan: Page '2026-05-14 Source: Promotion List/Export Filter Implementation' has no incoming links
   [warning] orphan: Page '2026-05-15 Source: promotion 与 promotion code 两张表' has no incoming links
 
+## [2026-06-14 08:58] ingest | nonexistent.md | branch: main
+Status: failed
+Error: Source file not found
+
