@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
+import { useWorkspaceStore } from './stores/workspaceStore'
 
 // Eagerly load core pages (first paint)
 import WikiBrowserPage from './pages/WikiBrowserPage'
@@ -27,25 +28,52 @@ function Lazy({children}: {children: React.ReactNode}) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>
 }
 
+/** Guard: redirect to /workbench if no project is active. */
+function ProjectGuard() {
+  const { active, loading, load } = useWorkspaceStore()
+  const location = useLocation()
+
+  useEffect(() => { load() }, [load])
+
+  // Always allow /workbench (and /config) regardless of project state
+  if (location.pathname === '/workbench' || location.pathname === '/config') {
+    return <Outlet />
+  }
+
+  if (loading) {
+    return <PageLoader />
+  }
+
+  if (!active) {
+    return <Navigate to="/workbench" replace />
+  }
+
+  return <Outlet />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<Navigate to="/wiki" replace />} />
-            <Route path="/wiki" element={<WikiBrowserPage />} />
-            <Route path="/wikifile" element={<WikiBrowserPage />} />
-            <Route path="/page/:name" element={<Lazy><PageDetail /></Lazy>} />
-            <Route path="/ingest" element={<IngestPage />} />
-            <Route path="/query" element={<QueryPage />} />
-            <Route path="/graph" element={<Lazy><GraphPage /></Lazy>} />
-            <Route path="/lint" element={<Lazy><LintPage /></Lazy>} />
-            <Route path="/config" element={<Lazy><ConfigPage /></Lazy>} />
-            <Route path="/branches" element={<Lazy><BranchesPage /></Lazy>} />
-            <Route path="/log" element={<Lazy><LogPage /></Lazy>} />
-            <Route path="/raw" element={<Lazy><RawFilesPage /></Lazy>} />
+            {/* Project-guarded routes – require an active project */}
+            <Route element={<ProjectGuard />}>
+              <Route path="/" element={<Navigate to="/wiki" replace />} />
+              <Route path="/wiki" element={<WikiBrowserPage />} />
+              <Route path="/wikifile" element={<WikiBrowserPage />} />
+              <Route path="/page/:name" element={<Lazy><PageDetail /></Lazy>} />
+              <Route path="/ingest" element={<IngestPage />} />
+              <Route path="/query" element={<QueryPage />} />
+              <Route path="/graph" element={<Lazy><GraphPage /></Lazy>} />
+              <Route path="/lint" element={<Lazy><LintPage /></Lazy>} />
+              <Route path="/branches" element={<Lazy><BranchesPage /></Lazy>} />
+              <Route path="/log" element={<Lazy><LogPage /></Lazy>} />
+              <Route path="/raw" element={<Lazy><RawFilesPage /></Lazy>} />
+            </Route>
+            {/* Always-accessible routes */}
             <Route path="/workbench" element={<Lazy><WorkbenchPage /></Lazy>} />
+            <Route path="/config" element={<Lazy><ConfigPage /></Lazy>} />
             <Route path="*" element={<Lazy><NotFoundPage /></Lazy>} />
           </Route>
         </Routes>

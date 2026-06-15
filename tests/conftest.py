@@ -3,9 +3,24 @@
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Env-var fixture – sets WIKI_PATH / RAW_PATH so the project-guard middleware
+# lets requests through. Use explicitly in API test modules that need it.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def mock_project_paths(temp_dir, monkeypatch):
+    """Set WIKI_PATH / RAW_PATH env vars so the project-guard middleware
+    lets requests through during API tests."""
+    monkeypatch.setenv("wiki_path", str(temp_dir / "wiki"))
+    monkeypatch.setenv("raw_path", str(temp_dir / "raw"))
+    from core.config import get_settings
+    get_settings.cache_clear()
 
 
 @pytest.fixture

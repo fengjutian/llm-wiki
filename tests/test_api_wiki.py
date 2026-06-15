@@ -19,27 +19,31 @@ SAMPLE_INGEST_JSON = json.dumps({
 })
 
 @pytest.fixture
-def client(temp_wiki):
-    with patch("api.wiki.get_llm_client") as mock_llm_fn:
-        llm = MagicMock()
-        llm.ingest.return_value = SAMPLE_INGEST_JSON
-        llm.query.return_value = "Based on the wiki, [[New Entity]] is relevant."
-        llm.lint.return_value = json.dumps({"health_score": "B", "issues": [{"severity": "warning", "type": "orphan", "description": "No incoming links", "affected_pages": ["Orphan"], "suggestion": "Add links", "auto_fixable": False}], "summary": "Mostly healthy."})
-        llm._load_schema.return_value = "# Schema"
-        llm.settings = MagicMock()
-        mock_llm_fn.return_value = llm
+def client(temp_wiki, mock_project_paths):
+    # Patch the core get_settings so ALL callers (api.wiki, middleware, etc.)
+    # see valid wiki/raw paths during tests.
+    with patch("core.config.get_settings") as mock_settings:
+        s = MagicMock()
+        s.wiki_root = temp_wiki["wiki"]
+        s.raw_root = temp_wiki["raw"]
+        s.wiki_path = str(temp_wiki["wiki"])
+        s.raw_path = str(temp_wiki["raw"])
+        s.schema_file = Path("CLAUDE.md")
+        s.wiki_branch = "main"
+        s.git_auto_commit = False
+        s.git_author_name = "Test"
+        s.git_author_email = "test@test.local"
+        s.llm_max_retries = 1
+        mock_settings.return_value = s
 
-        with patch("api.wiki.get_settings") as mock_settings:
-            s = MagicMock()
-            s.wiki_root = temp_wiki["wiki"]
-            s.raw_root = temp_wiki["raw"]
-            s.schema_file = Path("CLAUDE.md")
-            s.wiki_branch = "main"
-            s.git_auto_commit = False
-            s.git_author_name = "Test"
-            s.git_author_email = "test@test.local"
-            s.llm_max_retries = 1
-            mock_settings.return_value = s
+        with patch("api.wiki.get_llm_client") as mock_llm_fn:
+            llm = MagicMock()
+            llm.ingest.return_value = SAMPLE_INGEST_JSON
+            llm.query.return_value = "Based on the wiki, [[New Entity]] is relevant."
+            llm.lint.return_value = json.dumps({"health_score": "B", "issues": [{"severity": "warning", "type": "orphan", "description": "No incoming links", "affected_pages": ["Orphan"], "suggestion": "Add links", "auto_fixable": False}], "summary": "Mostly healthy."})
+            llm._load_schema.return_value = "# Schema"
+            llm.settings = MagicMock()
+            mock_llm_fn.return_value = llm
             yield TestClient(app)
 
 class TestWikiIngest:

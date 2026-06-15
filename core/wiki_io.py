@@ -16,6 +16,12 @@ from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+
+class NoProjectError(Exception):
+    """Raised when wiki/raw operations are attempted without an active project."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Data types
 # ---------------------------------------------------------------------------
@@ -110,11 +116,21 @@ class LogEntry:
 # ---------------------------------------------------------------------------
 
 def _wiki_root() -> Path:
-    return get_settings().wiki_root
+    root = get_settings().wiki_root
+    if root is None:
+        raise NoProjectError(
+            "No active project. Please create or activate a project first."
+        )
+    return root
 
 
 def _raw_root() -> Path:
-    return get_settings().raw_root
+    root = get_settings().raw_root
+    if root is None:
+        raise NoProjectError(
+            "No active project. Please create or activate a project first."
+        )
+    return root
 
 
 # ---------------------------------------------------------------------------

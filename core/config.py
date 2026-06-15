@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Paths
     # ------------------------------------------------------------------
-    wiki_path: str = "./wiki"
-    raw_path: str = "./raw"
+    wiki_path: str = ""
+    raw_path: str = ""
     schema_path: str = "./CLAUDE.md"
 
     # ------------------------------------------------------------------
@@ -95,11 +95,15 @@ class Settings(BaseSettings):
     # Derived / helper
     # ------------------------------------------------------------------
     @property
-    def wiki_root(self) -> Path:
+    def wiki_root(self) -> Path | None:
+        if not self.wiki_path:
+            return None
         return Path(self.wiki_path).resolve()
 
     @property
-    def raw_root(self) -> Path:
+    def raw_root(self) -> Path | None:
+        if not self.raw_path:
+            return None
         return Path(self.raw_path).resolve()
 
     @property

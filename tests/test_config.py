@@ -12,12 +12,22 @@ class TestSettings:
     def test_defaults(self):
         """Defaults should be sensible."""
         s = Settings()
-        assert s.wiki_path == "./wiki"
-        assert s.raw_path == "./raw"
+        assert s.wiki_path == ""
+        assert s.raw_path == ""
         assert s.wiki_branch == "main"
         assert s.git_auto_commit is True
         assert s.llm_model == "deepseek-v4-pro"
         assert s.llm_max_retries == 3
+
+    def test_wiki_root_empty_path_returns_none(self):
+        """When wiki_path is empty, wiki_root should return None."""
+        s = Settings(wiki_path="")
+        assert s.wiki_root is None
+
+    def test_raw_root_empty_path_returns_none(self):
+        """When raw_path is empty, raw_root should return None."""
+        s = Settings(raw_path="")
+        assert s.raw_root is None
 
     def test_wiki_root_property(self):
         s = Settings(wiki_path="/tmp/test-wiki")

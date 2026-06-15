@@ -9,7 +9,7 @@ from app.main import app
 
 
 @pytest.fixture
-def client(temp_wiki):
+def client(temp_wiki, mock_project_paths):
     mock_repo = MagicMock()
     mock_repo.active_branch.name = "main"
     b = MagicMock()
@@ -23,6 +23,8 @@ def client(temp_wiki):
                     s = MagicMock()
                     s.wiki_root = temp_wiki["wiki"]
                     s.raw_root = temp_wiki["raw"]
+                    s.wiki_path = str(temp_wiki["wiki"])
+                    s.raw_path = str(temp_wiki["raw"])
                     mock_settings.return_value = s
                     with patch("core.llm.get_llm_client", return_value=MagicMock()):
                         yield TestClient(app)

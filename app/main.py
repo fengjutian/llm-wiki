@@ -35,21 +35,42 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 _bg_tasks: dict[str, dict] = {}
 
 
+# ---------------------------------------------------------------------------
+# Project guard – all wiki/raw endpoints require an active project
+# ---------------------------------------------------------------------------
+from core.wiki_io import NoProjectError  # noqa: E402
+
+
+def _require_active_project() -> None:
+    """Raise HTTPException if no project is active (wiki_path is empty)."""
+    settings = get_settings()
+    if not settings.wiki_path or not settings.raw_path:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="No active project. Please create or activate a project first at /workbench.",
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    settings.wiki_root.mkdir(parents=True, exist_ok=True)
-    settings.raw_root.mkdir(parents=True, exist_ok=True)
-    try:
-        open_wiki_repo()
-        logger.info("Wiki repo ready at %s", settings.wiki_root)
-    except Exception as exc:
-        logger.warning("Git init skipped: %s", exc)
-    try:
-        get_graph(force_rebuild=True)
-        logger.info("Graph cache warmed")
-    except Exception as exc:
-        logger.warning("Graph init skipped: %s", exc)
+    # Only create default dirs if a project has been configured (wiki_path set)
+    if settings.wiki_root and settings.raw_root:
+        settings.wiki_root.mkdir(parents=True, exist_ok=True)
+        settings.raw_root.mkdir(parents=True, exist_ok=True)
+        try:
+            open_wiki_repo()
+            logger.info("Wiki repo ready at %s", settings.wiki_root)
+        except Exception as exc:
+            logger.warning("Git init skipped: %s", exc)
+        try:
+            get_graph(force_rebuild=True)
+            logger.info("Graph cache warmed")
+        except Exception as exc:
+            logger.warning("Graph init skipped: %s", exc)
+    else:
+        logger.info("No project active. Visit /workbench to create one.")
 
     # Register auto-ingest callback for folder watcher
     async def _auto_ingest_callback(rel_path: str) -> None:
@@ -80,6 +101,43 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="LLM Wiki", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+
+# ---------------------------------------------------------------------------
+# Middleware: require active project for all wiki/raw/watch/entity/graph
+#            /impact/branch/webhook endpoints
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def project_guard_middleware(request: Request, call_next):
+    """Block access to project-dependent endpoints when no project is active."""
+    path = request.url.path
+    # Whitelist: endpoints that do NOT require an active project
+    no_project_required = {
+        "/api/workbench",  # workbench manages projects itself
+        "/api/config",     # config is global
+        "/api/config/test",
+        "/api/tasks",      # status endpoint, handles missing project gracefully
+        "/health",
+    }
+    # Also allow static/SPA routes (they don't start with /api/)
+    if not path.startswith("/api/"):
+        return await call_next(request)
+
+    # Check if path needs a project
+    for prefix in no_project_required:
+        if path.startswith(prefix):
+            return await call_next(request)
+
+    # All other /api/* endpoints require an active project
+    try:
+        _require_active_project()
+    except Exception as exc:
+        return JSONResponse(
+            {"error": str(exc.detail) if hasattr(exc, "detail") else str(exc)},
+            status_code=getattr(exc, "status_code", 400),
+        )
+
+    return await call_next(request)
 
 
 # ============================================================================
@@ -599,9 +657,13 @@ async def api_tasks_status():
         git_info["branch"] = "—"
         git_info["dirty"] = False
 
-    # Page count
-    from core.wiki_io import list_pages
-    page_count = len(list_pages())
+    # Page count (safe against missing project)
+    page_count = 0
+    try:
+        from core.wiki_io import list_pages
+        page_count = len(list_pages())
+    except Exception:
+        pass
 
     # Active project
     wb_data = {}
