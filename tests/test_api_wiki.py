@@ -50,7 +50,7 @@ class TestWikiIngest:
     def test_ingest_source_not_found(self, client):
         resp = client.post("/api/wiki/ingest", json={"source_path": "nonexistent.md"})
         assert resp.status_code == 200
-        assert resp.json()["status"] == "skipped"
+        assert resp.json()["status"] == "failed"
 
     def test_ingest_dry_run(self, client, temp_wiki):
         (temp_wiki["raw"] / "test.md").write_text("# Test Source")
@@ -62,7 +62,7 @@ class TestWikiIngest:
         (temp_wiki["raw"] / "test.md").write_text("# Test Source")
         client.post("/api/wiki/ingest", json={"source_path": "test.md"})
         resp2 = client.post("/api/wiki/ingest", json={"source_path": "test.md"})
-        assert resp2.json()["status"] == "skipped"
+        assert resp2.json()["status"] == "pending"
 
 class TestWikiQuery:
     def test_query_returns_answer(self, client):

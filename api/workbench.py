@@ -31,6 +31,33 @@ def _load_workbench() -> dict:
         return {"projects": [], "active": None}
 
 
+def _discover_projects() -> list[dict]:
+    """Auto-discover existing project directories under projects/."""
+    projects_dir = BASE_DIR / "projects"
+    if not projects_dir.exists():
+        return []
+    discovered = []
+    from datetime import datetime, timezone
+    for d in sorted(projects_dir.iterdir()):
+        if not d.is_dir():
+            continue
+        wiki_dir = d / "wiki"
+        raw_dir = d / "raw"
+        # Must have at least wiki/ or raw/ subdirectory
+        if not wiki_dir.exists() and not raw_dir.exists():
+            continue
+        discovered.append({
+            "name": d.name,
+            "description": "",
+            "wiki_path": str(wiki_dir),
+            "raw_path": str(raw_dir),
+            "created_at": datetime.fromtimestamp(
+                d.stat().st_ctime, tz=timezone.utc
+            ).strftime("%Y-%m-%d %H:%M UTC"),
+        })
+    return discovered
+
+
 def _save_workbench(data: dict) -> None:
     """Persist workbench state to disk."""
     WORKBENCH_FILE.write_text(
@@ -66,6 +93,17 @@ class ProjectInfo(BaseModel):
 async def list_projects():
     """List all workbench projects."""
     wb = _load_workbench()
+    # Merge auto-discovered projects from filesystem with saved state
+    registered = {p["name"]: p for p in wb.get("projects", [])}
+    discovered = {p["name"]: p for p in _discover_projects()}
+    # Discovered projects that aren't registered yet get added
+    for name, proj in discovered.items():
+        if name not in registered:
+            wb.setdefault("projects", []).append(proj)
+            registered[name] = proj
+    # Save if we added new projects
+    if len(wb["projects"]) > len(registered) - len(discovered):
+        _save_workbench(wb)
     result = []
     for p in wb.get("projects", []):
         wiki_dir = Path(p["wiki_path"])
@@ -81,6 +119,13 @@ async def list_projects():
             "created_at": p.get("created_at", ""),
             "page_count": page_count,
         })
+    # Auto-activate first project if none is active
+    if wb.get("active") is None and result:
+        wb["active"] = result[0]["name"]
+        from core.config import get_settings
+        get_settings.cache_clear()
+        _save_workbench(wb)
+
     return {
         "projects": result,
         "active": wb.get("active"),
