@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from core.config import get_settings, SETTINGS_FILE
@@ -219,7 +219,11 @@ async def activate_project(name: str):
 
 @router.delete("/projects/{name}")
 async def delete_project(name: str, delete_files: bool = False):
-    """Delete a project. Set delete_files=true to also remove its directories."""
+    """Delete a project. Set delete_files=true to also remove its directories.
+
+    Note: deletion of the active project's files is blocked to avoid losing
+    the currently-loaded wiki; callers must first activate a different project.
+    """
     wb = _load_workbench()
     target = None
     idx = None
@@ -233,6 +237,13 @@ async def delete_project(name: str, delete_files: bool = False):
         raise HTTPException(status_code=404, detail=f"Project '{name}' not found")
 
     was_active = wb.get("active") == name
+    if was_active and delete_files:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete the files of the currently active project. "
+                   "Switch to another project first.",
+        )
+
     wb["projects"].pop(idx)
 
     if was_active:
@@ -257,8 +268,111 @@ async def delete_project(name: str, delete_files: bool = False):
     from core.graph_engine import invalidate_graph_cache
     invalidate_graph_cache()
 
-    logger.info("Deleted project '%s'", name)
-    return {"status": "deleted", "project": name}
+    logger.info("Deleted project '%s' (delete_files=%s)", name, delete_files)
+    return {"status": "deleted", "project": name, "files_deleted": delete_files}
+
+
+@router.post("/projects/{name}/rename")
+async def rename_project(name: str, request: Request):
+    """Rename a project. Body: { "new_name": "..." }.
+
+    Renames the project directory on disk and updates workbench.json. If the
+    project is active, the active wiki/raw paths in settings.json are updated
+    to point at the new location.
+    """
+    body = await request.json()
+    new_name_raw = (body.get("new_name") or "").strip()
+    if not new_name_raw:
+        raise HTTPException(status_code=400, detail="new_name is required")
+
+    # Sanitize using the same rules as create_project
+    safe_new = (
+        new_name_raw
+        .replace("/", "-")
+        .replace("\\", "-")
+        .replace(":", "-")
+        .replace(" ", "_")
+    )
+    if not safe_new or safe_new in (".", ".."):
+        raise HTTPException(status_code=400, detail=f"Invalid name: {new_name_raw!r}")
+
+    wb = _load_workbench()
+    target = None
+    for p in wb.get("projects", []):
+        if p["name"] == name:
+            target = p
+            break
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"Project '{name}' not found")
+
+    if name == new_name_raw:
+        # No-op rename; return current entry
+        return {"status": "renamed", "project": target, "files_renamed": False}
+
+    # Conflict check on the *display* name (case-sensitive) — keep the
+    # original behaviour where two projects with the same name are rejected.
+    for p in wb.get("projects", []):
+        if p["name"] == new_name_raw:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Project '{new_name_raw}' already exists",
+            )
+
+    # Rename the on-disk directory. We use the directory of wiki_path (the
+    # project root that contains both wiki/ and raw/) and reconstruct paths
+    # in the new location.
+    old_project_dir = Path(target["wiki_path"]).parent.resolve()
+    new_project_dir = (BASE_DIR / "projects" / safe_new).resolve()
+
+    if new_project_dir.exists():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Target directory already exists: {new_project_dir}",
+        )
+
+    renamed_on_disk = False
+    if old_project_dir.exists():
+        try:
+            old_project_dir.rename(new_project_dir)
+            renamed_on_disk = True
+        except OSError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to rename directory: {exc}",
+            )
+
+    # Update workbench entry
+    target["name"] = new_name_raw
+    if renamed_on_disk:
+        target["wiki_path"] = str(new_project_dir / "wiki")
+        target["raw_path"] = str(new_project_dir / "raw")
+    # If the directory didn't exist on disk, keep the old paths — the user
+    # may have registered a project pointing to an external location.
+
+    if wb.get("active") == name:
+        wb["active"] = new_name_raw
+        if renamed_on_disk:
+            _apply_project(target)
+
+    _save_workbench(wb)
+
+    # Invalidate caches so the new paths take effect immediately
+    from core.config import get_settings
+    get_settings.cache_clear()
+    from core.graph_engine import invalidate_graph_cache
+    invalidate_graph_cache()
+
+    logger.info(
+        "Renamed project '%s' -> '%s' (dir_renamed=%s)",
+        name, new_name_raw, renamed_on_disk,
+    )
+    return {
+        "status": "renamed",
+        "project": target,
+        "old_name": name,
+        "new_name": new_name_raw,
+        "files_renamed": renamed_on_disk,
+    }
 
 
 # ---------------------------------------------------------------------------

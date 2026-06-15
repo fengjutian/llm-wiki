@@ -9,7 +9,8 @@ interface WorkspaceState {
   load: () => Promise<void>
   activate: (name: string) => Promise<void>
   createProject: (name: string, desc: string) => Promise<void>
-  removeProject: (name: string) => Promise<void>
+  removeProject: (name: string, deleteFiles?: boolean) => Promise<void>
+  renameProject: (oldName: string, newName: string) => Promise<void>
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -42,8 +43,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     await get().load()
   },
 
-  removeProject: async (name) => {
-    await api.del(`/api/workbench/projects/${encodeURIComponent(name)}`)
+  removeProject: async (name, deleteFiles = false) => {
+    const qs = deleteFiles ? '?delete_files=true' : ''
+    await api.del(`/api/workbench/projects/${encodeURIComponent(name)}${qs}`)
+    await get().load()
+  },
+
+  renameProject: async (oldName, newName) => {
+    await api.post(
+      `/api/workbench/projects/${encodeURIComponent(oldName)}/rename`,
+      { new_name: newName },
+    )
     await get().load()
   },
 }))
